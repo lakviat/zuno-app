@@ -199,9 +199,11 @@ export function PrivacyScreen({ navigate }: { navigate: Navigate }) {
         </Button>
         {live.enabled && (
           <Txt muted>
-            {sample
-              ? motionLabel(sample, state.discovery.units ?? 'mph')
-              : 'Waiting for an accurate GPS sample…'}{' '}
+            {live.reducedAccuracy
+              ? 'Approximate Location is on. Precise movement and speed are unavailable; browsing still works.'
+              : sample
+                ? motionLabel(sample, state.discovery.units ?? 'mph')
+                : 'Waiting for an accurate GPS sample…'}{' '}
             · On this device only
           </Txt>
         )}

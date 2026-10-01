@@ -17,6 +17,7 @@ const LiveContext = createContext<{
   enabled: boolean;
   busy: boolean;
   error: string;
+  reducedAccuracy: boolean;
   start(): Promise<void>;
   stop(): void;
   mock: boolean;
@@ -31,6 +32,7 @@ export function LiveLocationProvider({ children }: PropsWithChildren) {
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [reducedAccuracy, setReducedAccuracy] = useState(false);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [distance, setDistance] = useState(15);
   const [mock, setMock] = useState(false);
@@ -87,6 +89,9 @@ export function LiveLocationProvider({ children }: PropsWithChildren) {
             setEnabled(false);
           }
         },
+        (accuracy) => {
+          if (alive) setReducedAccuracy(accuracy === 'reduced');
+        },
       )
       .then((sub) => {
         if (alive) watcher = sub;
@@ -123,14 +128,18 @@ export function LiveLocationProvider({ children }: PropsWithChildren) {
         enabled,
         busy,
         error,
+        reducedAccuracy,
         mock,
         async start() {
           const token = ++generation.current;
           setBusy(true);
           setError('');
           try {
-            await deviceLocation.requestPermission();
-            if (token === generation.current) setEnabled(true);
+            const accuracy = await deviceLocation.requestPermission();
+            if (token === generation.current) {
+              setReducedAccuracy(accuracy === 'reduced');
+              setEnabled(true);
+            }
           } catch (e) {
             if (token === generation.current)
               setError(e instanceof Error ? e.message : 'Location unavailable.');

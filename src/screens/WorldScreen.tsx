@@ -29,6 +29,7 @@ import { BottomNav, Header, MobilePeoplePill, WorldPanel } from './HomeChrome';
 import { SheetHost } from '../components/Sheet';
 import type { Route } from '../navigation/routes';
 import { tokens } from '../theme/tokens';
+import { motionStore } from '../features/location/store';
 
 export function WorldScreen() {
   const {
@@ -300,7 +301,12 @@ export function WorldScreen() {
           <IconButton
             name="navigation"
             label="Recenter demo map"
-            onPress={() => map.current?.recenter()}
+            onPress={() => {
+              const sample = motionStore.get(state.currentUserId);
+              map.current?.recenter(
+                sample && Date.now() - sample.timestamp < 90000 ? sample.coordinate : undefined,
+              );
+            }}
             style={tokens.shadow}
           />
         </View>

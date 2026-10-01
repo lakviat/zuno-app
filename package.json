@@ -37,6 +37,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "ios:preview": "node scripts/ios-preview.mjs",
+    "ios:prepare": "node scripts/ios-distribution.mjs --prepare-only",
+    "ios:archive:unsigned": "node scripts/ios-distribution.mjs",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

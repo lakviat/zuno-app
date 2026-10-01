@@ -52,54 +52,60 @@ export function MeetupsScreen({
         </Button>
       }
     >
-      <View style={{ gap: 8 }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Switch demo viewer"
-          accessibilityState={{ expanded: previewOpen }}
-          onPress={() => setPreviewOpen(!previewOpen)}
-          style={[
-            ui.between,
-            {
-              minHeight: 44,
-              paddingHorizontal: 14,
-              borderRadius: 14,
-              backgroundColor: colors.raised,
-            },
-          ]}
-        >
-          <Txt muted style={{ fontSize: 12 }}>
-            Viewing as{' '}
-            <Txt weight="bold" style={{ fontSize: 12 }}>
-              {viewerName}
-            </Txt>{' '}
-            · Local demo
-          </Txt>
-          <Icon name={previewOpen ? 'chevron-up' : 'repeat'} size={16} />
-        </Pressable>
-        {previewOpen && (
-          <View
-            style={{ padding: 12, backgroundColor: colors.accentSoft, borderRadius: 14, gap: 10 }}
+      {__DEV__ ? (
+        <View style={{ gap: 8 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Switch demo viewer"
+            accessibilityState={{ expanded: previewOpen }}
+            onPress={() => setPreviewOpen(!previewOpen)}
+            style={[
+              ui.between,
+              {
+                minHeight: 44,
+                paddingHorizontal: 14,
+                borderRadius: 14,
+                backgroundColor: colors.raised,
+              },
+            ]}
           >
-            <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
-              {['me', 'noah'].map((id) => (
-                <Chip
-                  key={id}
-                  label={`View as ${state.people.find((p) => p.user.id === id)?.profile.displayName.split(' ')[0] ?? id}`}
-                  active={meetupViewerId === id}
-                  onPress={() => {
-                    setMeetupViewerId(id);
-                    setPreviewOpen(false);
-                  }}
-                />
-              ))}
-            </View>
-            <Txt muted style={{ fontSize: 11, lineHeight: 16 }}>
-              Try Noah to see what a non-friend can discover. His preview hides personal map pins.
+            <Txt muted style={{ fontSize: 12 }}>
+              Viewing as{' '}
+              <Txt weight="bold" style={{ fontSize: 12 }}>
+                {viewerName}
+              </Txt>{' '}
+              · Local demo
             </Txt>
-          </View>
-        )}
-      </View>
+            <Icon name={previewOpen ? 'chevron-up' : 'repeat'} size={16} />
+          </Pressable>
+          {previewOpen && (
+            <View
+              style={{ padding: 12, backgroundColor: colors.accentSoft, borderRadius: 14, gap: 10 }}
+            >
+              <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
+                {['me', 'noah'].map((id) => (
+                  <Chip
+                    key={id}
+                    label={`View as ${state.people.find((p) => p.user.id === id)?.profile.displayName.split(' ')[0] ?? id}`}
+                    active={meetupViewerId === id}
+                    onPress={() => {
+                      setMeetupViewerId(id);
+                      setPreviewOpen(false);
+                    }}
+                  />
+                ))}
+              </View>
+              <Txt muted style={{ fontSize: 11, lineHeight: 16 }}>
+                Try Noah to see what a non-friend can discover. His preview hides personal map pins.
+              </Txt>
+            </View>
+          )}
+        </View>
+      ) : (
+        <Txt muted style={{ fontSize: 12 }}>
+          Local preview. Meetups and messages stay on this device.
+        </Txt>
+      )}
       {clusterIds && (
         <Button kind="secondary" onPress={() => navigate({ name: 'meetups' })}>
           Show all meetups

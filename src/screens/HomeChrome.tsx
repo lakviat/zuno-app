@@ -31,7 +31,12 @@ export function Header({
     >
       <View style={[ui.between, { height: wide ? 86 : 70, paddingHorizontal: wide ? 34 : 20 }]}>
         <View style={[ui.row, { gap: 24 }]}>
-          <Brand small={!wide} />
+          <View style={{ gap: 2 }}>
+            <Brand small={!wide} />
+            <Txt muted style={{ fontSize: 10 }}>
+              Local preview · sample people
+            </Txt>
+          </View>
           {wide && (
             <>
               <View style={{ width: 1, height: 28, backgroundColor: colors.line }} />

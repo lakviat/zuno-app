@@ -26,6 +26,12 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.xcarchive/
+*.ipa
+*.dSYM/
+*.xcresult/
+DerivedData/
+release-artifacts/
 
 # Metro
 .metro-health-check*

@@ -92,10 +92,15 @@ run(
   'build',
 );
 const app = path.join(derived, 'Build/Products/Release-iphonesimulator/Zuno.app');
+const bundleIdentifier = execFileSync(
+  '/usr/libexec/PlistBuddy',
+  ['-c', 'Print :CFBundleIdentifier', path.join(app, 'Info.plist')],
+  { encoding: 'utf8' },
+).trim();
 execFileSync('xcrun', ['simctl', 'install', device.udid, app], { stdio: 'inherit' });
 execFileSync(
   'xcrun',
-  ['simctl', 'launch', '--terminate-running-process', device.udid, 'app.zuno.mobile'],
+  ['simctl', 'launch', '--terminate-running-process', device.udid, bundleIdentifier],
   { stdio: 'inherit' },
 );
 console.log(

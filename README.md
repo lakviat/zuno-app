@@ -92,6 +92,13 @@ Map tiles require internet. App data, avatars, and fonts are local. On web, `pos
 
 ## iOS and Android
 
+For signing and TestFlight preparation, see [TESTFLIGHT_READINESS.md](TESTFLIGHT_READINESS.md).
+`npm run ios:prepare` creates the distribution workspace outside Desktop/iCloud;
+`npm run ios:archive:unsigned` additionally validates an unsigned device Release archive without
+Apple credentials. TestFlight versioning is local: `package.json` owns the marketing version and
+`ios.buildNumber` in `app.config.ts` owns the build number. This first beta intentionally uses
+clearly labeled local sample data; real accounts and network delivery are not implemented.
+
 For iOS Simulator, install and finish Xcode setup, accept its license, and install a simulator runtime. Apple Maps needs no map API key. Expo Go on a physical iPhone may require signing into the same Expo account as the CLI.
 
 For a clean local iOS preview, run `npm run ios:preview -- "iPhone 17"` (or pass a simulator UDID). It uses the installed dependencies, CocoaPods and Xcode to build and install **Zuno** as a separate simulator app, without a Metro server or Expo Go. The script builds in a temporary directory outside Desktop/iCloud to avoid File Provider metadata causing framework code-sign failures. It preserves the source checkout and existing standalone app data. Build paths and logs are printed; `ZUNO_IOS_BUILD_ROOT` can select another local cache directory. Generated iOS files stay ignored. The `with-ios-scenes` config plugin enables Expo’s scene lifecycle support required by the iOS 27 SDK; it is also compatible with the iOS 18 simulator. This is a simulator build, not a signed physical-device or App Store build.
