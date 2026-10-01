@@ -51,7 +51,7 @@ export function ZoomGrip({ gesture, active, onStep, children }: ZoomGripProps) {
       onPointerUp={(event) => {
         if (pointer.current?.id === event.pointerId) {
           pointer.current = null;
-          gesture.end();
+          gesture.end(true);
           event.currentTarget.releasePointerCapture(event.pointerId);
         }
       }}

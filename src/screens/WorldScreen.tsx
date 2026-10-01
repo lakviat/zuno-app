@@ -54,7 +54,7 @@ export function WorldScreen() {
   const zoomMap = useCallback((delta: number) => map.current?.zoomBy(delta), []);
   const beginZoom = useCallback(() => map.current?.beginZoom(), []);
   const updateZoom = useCallback((delta: number) => map.current?.updateZoom(delta), []);
-  const endZoom = useCallback(() => map.current?.endZoom(), []);
+  const endZoom = useCallback((commitPending?: boolean) => map.current?.endZoom(commitPending), []);
   const navigate = useCallback(
     (next: Route) => {
       map.current?.endZoom();

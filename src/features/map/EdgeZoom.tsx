@@ -16,7 +16,7 @@ export function EdgeZoom({
   onZoom(delta: number): void;
   onBegin(): void;
   onUpdate(delta: number): void;
-  onEnd(): void;
+  onEnd(commitPending?: boolean): void;
 }) {
   const { colors, state, dispatch } = useApp();
   const [active, setActive] = useState(false);
@@ -30,9 +30,9 @@ export function EdgeZoom({
           onBegin();
         },
         update: onUpdate,
-        end: () => {
+        end: (commitPending) => {
           setActive(false);
-          onEnd();
+          onEnd(commitPending);
         },
       }),
     [onBegin, onUpdate, onEnd, dispatch],

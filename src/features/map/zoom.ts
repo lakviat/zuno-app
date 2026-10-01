@@ -8,7 +8,7 @@ export const dragZoom = (dy: number) =>
 export function createZoomGesture(camera: {
   begin(): void;
   update(delta: number): void;
-  end(): void;
+  end(commitPending?: boolean): void;
 }) {
   let active = false;
   return {
@@ -19,10 +19,10 @@ export function createZoomGesture(camera: {
     move(dy: number) {
       if (active) camera.update(dragZoom(dy));
     },
-    end() {
+    end(commitPending = false) {
       if (active) {
         active = false;
-        camera.end();
+        camera.end(commitPending);
       }
     },
   };
@@ -41,7 +41,12 @@ export function createZoomCamera<T extends { zoom: number }>(
   let start: T | undefined;
   let pending = 0;
   let frame: number | undefined;
-  const end = () => {
+  const end = (commitPending = false) => {
+    // Native move and release events can arrive within the same animation frame.
+    // Commit the last movement on release, but never apply a late camera read.
+    if (commitPending && start && frame !== undefined) {
+      apply(start, clampZoom(start.zoom + pending));
+    }
     generation++;
     start = undefined;
     pending = 0;

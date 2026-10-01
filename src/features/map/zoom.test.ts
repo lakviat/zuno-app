@@ -75,7 +75,7 @@ describe('one-handed zoom', () => {
     );
     camera.begin();
     camera.update(1);
-    camera.end();
+    camera.end(true);
     resolve({ zoom: 12 });
     await Promise.resolve();
     expect(applied).toEqual([]);
@@ -84,5 +84,42 @@ describe('one-handed zoom', () => {
     resolve({ zoom: 12 });
     await step;
     expect(applied).toEqual([]);
+  });
+  it('commits a fast drag on release and cancels its queued animation frame', async () => {
+    let scheduled: (() => void) | undefined;
+    const applied: number[] = [];
+    const camera = createZoomCamera(
+      () => ({ zoom: 12 }),
+      (_, z) => applied.push(z),
+      (cb) => {
+        scheduled = cb;
+        return 1;
+      },
+      () => {
+        scheduled = undefined;
+      },
+    );
+    const gesture = createZoomGesture(camera);
+    gesture.start();
+    await Promise.resolve();
+    gesture.move(-126);
+    gesture.end(true);
+    expect(applied).toEqual([13]);
+    expect(scheduled).toBeUndefined();
+    gesture.end(true);
+    expect(applied).toEqual([13]);
+
+    gesture.start();
+    await Promise.resolve();
+    gesture.move(126);
+    gesture.end(true);
+    expect(applied).toEqual([13, 11]);
+
+    gesture.start();
+    await Promise.resolve();
+    gesture.move(-126);
+    gesture.end();
+    expect(applied).toEqual([13, 11]);
+    expect(scheduled).toBeUndefined();
   });
 });

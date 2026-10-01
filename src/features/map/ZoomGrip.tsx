@@ -51,7 +51,7 @@ function createResponder(gesture: ZoomGripProps['gesture']) {
       if (state.numberActiveTouches === 1) gesture.move(event.nativeEvent.pageY - originY);
       else gesture.end();
     },
-    onPanResponderRelease: () => gesture.end(),
+    onPanResponderRelease: () => gesture.end(true),
     onPanResponderTerminate: () => gesture.end(),
     onPanResponderTerminationRequest: () => true,
   });

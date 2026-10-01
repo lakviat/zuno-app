@@ -5,7 +5,7 @@ export interface MapHandle {
   zoomBy(delta: number): void;
   beginZoom(): void;
   updateZoom(deltaFromStart: number): void;
-  endZoom(): void;
+  endZoom(commitPending?: boolean): void;
 }
 export interface SocialMapProps {
   people: Person[];

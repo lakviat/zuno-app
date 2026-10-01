@@ -7,7 +7,7 @@ import React, {
   useState,
 } from 'react';
 import MapView, { Marker, type Region } from 'react-native-maps';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Avatar, Txt } from '../../components/ui';
 import { useApp } from '../../state/AppContext';
 import { FriendMarker, MeetupMarker, MeetupClusterMarker } from './MapMarker';
@@ -20,7 +20,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
   const map = useRef<MapView>(null);
   const { width, height } = useWindowDimensions();
   const { colors } = useApp();
-  const [tilesLoaded, setTilesLoaded] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setSlow(true), 12000);
@@ -97,7 +97,12 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
         ref={map}
         style={StyleSheet.absoluteFill}
         initialRegion={region}
-        onMapLoaded={() => setTilesLoaded(true)}
+        // Apple Maps never emits onMapLoaded; its ready event starts native rendering.
+        // Android still waits for tiles so a Google Maps authorization failure stays visible.
+        onMapReady={() => {
+          if (Platform.OS === 'ios') setMapReady(true);
+        }}
+        onMapLoaded={() => setMapReady(true)}
         onRegionChange={(next) => {
           regionRef.current = next;
         }}
@@ -224,7 +229,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
           </Marker>
         )}
       </MapView>
-      {!tilesLoaded && (
+      {!mapReady && (
         <View
           pointerEvents="none"
           style={{
