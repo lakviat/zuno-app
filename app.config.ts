@@ -8,7 +8,11 @@ const config: ExpoConfig = {
   orientation: 'default',
   userInterfaceStyle: 'automatic',
   icon: './assets/icon.png',
-  ios: { supportsTablet: true, bundleIdentifier: 'app.zuno.mobile' },
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: 'app.zuno.mobile',
+    infoPlist: { EXDevMenuShowFloatingActionButton: false },
+  },
   android: {
     package: 'app.zuno.mobile',
     adaptiveIcon: {
@@ -18,6 +22,7 @@ const config: ExpoConfig = {
   },
   web: { favicon: './assets/favicon.png', name: 'Zuno — A little closer', bundler: 'metro' },
   plugins: [
+    './plugins/with-ios-scenes',
     [
       'expo-location',
       {

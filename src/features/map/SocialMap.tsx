@@ -2,6 +2,7 @@ import React, {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -11,8 +12,9 @@ import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Avatar, Txt } from '../../components/ui';
 import { useApp } from '../../state/AppContext';
 import { FriendMarker, MeetupMarker, MeetupClusterMarker } from './MapMarker';
-import { createZoomCamera, MIN_ZOOM, MAX_ZOOM } from './zoom';
-import { createCameraSnapshot } from './cameraSnapshot';
+import { MIN_ZOOM, MAX_ZOOM } from './zoom';
+import { createNativeCamera } from './nativeCamera';
+import { APPLE_MIN_ALTITUDE, APPLE_MAX_ALTITUDE, globeViewportHeight } from './appleCamera';
 import { clusterMeetups } from './meetupClusters';
 import { clusterPeople } from './clusters';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
@@ -22,6 +24,9 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
   const { width, height } = useWindowDimensions();
   const { colors } = useApp();
   const [mapReady, setMapReady] = useState(false);
+  const [globe, setGlobe] = useState(false);
+  const [altitude, setAltitude] = useState(0);
+  const viewportHeight = globe ? globeViewportHeight(altitude, width, height) : height;
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setSlow(true), 12000);
@@ -33,48 +38,27 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
     longitudeDelta: 0.05,
   });
   const regionRef = useRef(region);
-  const cameraSnapshot = useMemo(
+  const zoom = useMemo(
     () =>
-      createCameraSnapshot(async () => {
-        if (!map.current) throw new Error('Map not ready');
-        const camera = await map.current.getCamera();
-        // Apple exposes altitude; Android exposes zoom. Normalize the same zoom delta.
-        return {
-          ...camera,
-          zoom: camera.zoom ?? Math.log2(360 / regionRef.current.longitudeDelta),
-        };
+      createNativeCamera({
+        apple: Platform.OS === 'ios',
+        read: async () => {
+          if (!map.current) throw new Error('Map not ready');
+          return map.current.getCamera();
+        },
+        apply: (camera) => map.current?.setCamera(camera),
+        onGlobeChange: setGlobe,
+        onAltitudeChange: setAltitude,
       }),
     [],
   );
-  const zoom = useMemo(
-    () =>
-      createZoomCamera(cameraSnapshot.read, (start, level) => {
-        const next = {
-          ...start,
-          center: start.center,
-          heading: 0,
-          pitch: 0,
-          zoom: level,
-          ...(start.altitude ? { altitude: start.altitude * 2 ** (start.zoom - level) } : {}),
-        };
-        cameraSnapshot.write(next);
-        map.current?.setCamera(next);
-      }),
-    [cameraSnapshot],
-  );
-  useEffect(
-    () => () => {
-      zoom.end();
-      cameraSnapshot.invalidate();
-    },
-    [zoom, cameraSnapshot],
-  );
+  useEffect(() => () => zoom.dispose(), [zoom]);
+  useLayoutEffect(() => zoom.presentationReady(globe), [globe, viewportHeight, zoom]);
   useImperativeHandle(
     ref,
     () => ({
       recenter(coordinate = MIAMI) {
-        zoom.end();
-        cameraSnapshot.invalidate();
+        zoom.nativeGesture();
         // Zero-duration moves cannot continue behind a new thumb gesture.
         map.current?.animateToRegion(
           { ...coordinate, latitudeDelta: 0.06, longitudeDelta: 0.05 },
@@ -88,7 +72,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
       updateZoom: zoom.update,
       endZoom: zoom.end,
     }),
-    [zoom, cameraSnapshot],
+    [zoom],
   );
   // The native viewport region provides a local screen approximation for clustering.
   // Provider-specific projection can replace this for globe/pitched views later.
@@ -107,38 +91,44 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
     }),
   );
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <View style={[StyleSheet.absoluteFill, globe && { backgroundColor: '#000' }]}>
       <MapView
         ref={map}
-        style={StyleSheet.absoluteFill}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          height: viewportHeight,
+          top: (height - viewportHeight) / 2,
+        }}
         initialRegion={region}
         // Apple Maps never emits onMapLoaded; its ready event starts native rendering.
         // Android still waits for tiles so a Google Maps authorization failure stays visible.
         onMapReady={() => {
           if (Platform.OS === 'ios') setMapReady(true);
-          cameraSnapshot.refresh();
+          zoom.ready();
         }}
         onMapLoaded={() => setMapReady(true)}
+        onTouchStart={() => zoom.nativeGesture()}
         onRegionChange={(next) => {
-          // Ignore repeated native notifications for the same resting viewport.
-          if (
-            Object.keys(next).some(
-              (key) =>
-                Math.abs(next[key as keyof Region] - regionRef.current[key as keyof Region]) > 1e-7,
-            )
-          ) {
-            cameraSnapshot.invalidate();
-          }
           regionRef.current = next;
         }}
         onRegionChangeComplete={(next) => {
           regionRef.current = next;
-          setRegion(next);
-          cameraSnapshot.invalidate();
-          cameraSnapshot.refresh();
+          if (!zoom.isActive()) setRegion(next);
+          zoom.settled();
         }}
-        minZoomLevel={MIN_ZOOM}
-        maxZoomLevel={MAX_ZOOM}
+        mapType={globe ? 'hybridFlyover' : 'standard'}
+        minZoomLevel={Platform.OS === 'ios' ? undefined : MIN_ZOOM}
+        maxZoomLevel={Platform.OS === 'ios' ? undefined : MAX_ZOOM}
+        cameraZoomRange={
+          Platform.OS === 'ios'
+            ? {
+                minCenterCoordinateDistance: APPLE_MIN_ALTITUDE,
+                maxCenterCoordinateDistance: APPLE_MAX_ALTITUDE,
+              }
+            : undefined
+        }
         userInterfaceStyle={props.dark ? 'dark' : 'light'}
         rotateEnabled={false}
         pitchEnabled={false}
@@ -175,7 +165,8 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
               key={cluster.id}
               coordinate={coordinate}
               accessibilityLabel={'Zoom into ' + cluster.people.length + ' friends'}
-              onPress={() =>
+              onPress={() => {
+                zoom.nativeGesture();
                 map.current?.animateToRegion(
                   {
                     ...coordinate,
@@ -183,8 +174,8 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
                     longitudeDelta: region.longitudeDelta / 2,
                   },
                   0,
-                )
-              }
+                );
+              }}
             >
               <View
                 style={{

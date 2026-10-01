@@ -36,28 +36,53 @@ export function createZoomCamera<T extends { zoom: number }>(
   apply: (start: T, zoom: number) => void,
   schedule: (callback: () => void) => number = requestAnimationFrame,
   cancel: (id: number) => void = cancelAnimationFrame,
+  options: {
+    min?: number;
+    max?: number;
+    finishPendingRead?: boolean;
+    rebaseAtLimits?: boolean;
+  } = {},
 ) {
   let generation = 0;
   let start: T | undefined;
   let pending = 0;
   let frame: number | undefined;
+  let released = false;
+  let currentZoom = 0;
+  let appliedDelta = 0;
+  const clamp = (level: number) =>
+    Math.max(options.min ?? MIN_ZOOM, Math.min(options.max ?? MAX_ZOOM, level));
+  const applyPending = () => {
+    if (!start) return;
+    currentZoom = clamp(
+      options.rebaseAtLimits ? currentZoom + pending - appliedDelta : start.zoom + pending,
+    );
+    appliedDelta = pending;
+    apply(start, currentZoom);
+  };
   const end = (commitPending = false) => {
     // Native move and release events can arrive within the same animation frame.
-    // Commit the last movement on release, but never apply a late camera read.
+    // Commit the last movement on release when the starting camera is ready.
     if (commitPending && start && frame !== undefined) {
-      apply(start, clampZoom(start.zoom + pending));
+      applyPending();
+    }
+    // A short iOS drag may release before getCamera crosses the native bridge.
+    // Commit its endpoint once ready; a new gesture/pan/cancel still invalidates it.
+    if (commitPending && !start && pending !== 0 && options.finishPendingRead) {
+      released = true;
+      return;
     }
     generation++;
     start = undefined;
     pending = 0;
+    released = false;
+    appliedDelta = 0;
     if (frame !== undefined) cancel(frame);
     frame = undefined;
   };
   const flush = () => {
     frame = undefined;
-    if (start && pending !== 0) apply(start, clampZoom(start.zoom + pending));
-    // A reversal to the starting position must restore the original zoom.
-    else if (start) apply(start, clampZoom(start.zoom));
+    applyPending();
   };
   const update = (delta: number) => {
     pending = delta;
@@ -77,6 +102,12 @@ export function createZoomCamera<T extends { zoom: number }>(
       const accept = (camera: T) => {
         if (token !== generation) return;
         start = camera;
+        currentZoom = clamp(camera.zoom);
+        if (released) {
+          applyPending();
+          end();
+          return;
+        }
         if (pending !== 0) update(pending);
       };
       if (!(reading instanceof Promise)) {
@@ -94,7 +125,7 @@ export function createZoomCamera<T extends { zoom: number }>(
       const token = generation;
       try {
         const camera = await read();
-        if (token === generation) apply(camera, clampZoom(camera.zoom + delta));
+        if (token === generation) apply(camera, clamp(camera.zoom + delta));
       } catch {
         /* A provider that is not ready can safely ignore a button press. */
       }
