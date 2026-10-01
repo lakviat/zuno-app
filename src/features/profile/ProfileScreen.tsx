@@ -123,15 +123,16 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
             <View style={{ alignItems: 'center', gap: 4 }}>
               <Txt weight="display" style={{ fontSize: 26 }}>
                 {
-                  state.plans.filter(
+                  state.meetups.filter(
                     (p) =>
-                      p.participants.some((x) => x.userId === me.user.id) &&
-                      Date.parse(p.expiresAt) > now,
+                      p.participantIds.includes(me.user.id) &&
+                      Date.parse(p.endsAt) > now &&
+                      p.status !== 'cancelled',
                   ).length
                 }
               </Txt>
               <Txt muted style={{ fontSize: 11 }}>
-                little plans
+                little meetups
               </Txt>
             </View>
           </View>
@@ -186,9 +187,9 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
               <Button
                 kind="secondary"
                 icon="plus"
-                onPress={() => navigate({ name: 'create-plan', friendId: person.user.id })}
+                onPress={() => navigate({ name: 'create-meetup', friendId: person.user.id })}
               >
-                Make a plan together
+                Make a meetup together
               </Button>
               <Button kind="quiet" onPress={() => setConfirm('remove')}>
                 Remove friend
@@ -238,7 +239,7 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
           </Txt>
           <Txt muted style={{ fontSize: 12, lineHeight: 19 }}>
             {confirm === 'reset'
-              ? 'Messages, plans, profile edits and settings will be erased. A fresh sample world will replace them. No online account exists yet.'
+              ? 'Messages, meetups, profile edits and settings will be erased. A fresh sample world will replace them. No online account exists yet.'
               : confirm === 'report'
                 ? 'Reports are stored locally in this prototype and aren’t sent to a moderation team.'
                 : 'They’ll disappear from your map. Any temporary location access will end.'}

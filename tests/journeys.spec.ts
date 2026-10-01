@@ -18,9 +18,9 @@ test('map selection, zoom, local messaging and persistence', async ({ page }) =>
   const grip = page.getByLabel('One-handed map zoom. Slide up to zoom in, down to zoom out.');
   const gripBox = (await grip.boundingBox())!;
   const gripBefore = await alex.boundingBox();
-  await page.mouse.move(gripBox.x + 20, gripBox.y + 85);
+  await page.mouse.move(gripBox.x + 20, gripBox.y + 45);
   await page.mouse.down();
-  await page.mouse.move(gripBox.x + 20, gripBox.y + 25, { steps: 12 });
+  await page.mouse.move(gripBox.x + 20, gripBox.y - 15, { steps: 12 });
   await page.mouse.up();
   await expect.poll(async () => (await alex.boundingBox())?.x).not.toBe(gripBefore?.x);
   await page.getByRole('button', { name: 'Recenter demo map' }).click();
@@ -55,22 +55,61 @@ test('incoming and outgoing requests, then blocking a friend', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Find Alex Rivera', exact: true })).toHaveCount(0);
 });
 
-test('creates a plan, joins and leaves another plan', async ({ page }) => {
-  await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.getByRole('button', { name: 'Make a plan', exact: true }).click();
-  await page.getByRole('textbox', { name: 'What’s the plan?' }).fill('A sunny afternoon walk');
+test('creates a public meetup, joins as a non-friend, persists, edits and cancels', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Meetups', exact: true }).click();
+  await page.getByRole('button', { name: 'Create a meetup', exact: true }).click();
+  await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Add a title');
   await page
-    .getByRole('textbox', { name: 'A little more (optional)' })
-    .fill('Meet by the park entrance.');
-  await page.getByRole('button', { name: 'Alex', exact: true }).click();
-  await page.getByRole('button', { name: 'Let’s make it happen' }).click();
-  await expect(page.getByText('A sunny afternoon walk', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'You’re in · tap to leave' })).toBeVisible();
+    .getByRole('textbox', { name: 'Meetup title', exact: true })
+    .fill('A sunny afternoon walk');
+  await page.getByLabel('Starts', { exact: true }).fill('2099-10-02T10:00');
+  await page.getByLabel('Ends', { exact: true }).fill('2099-10-02T12:00');
+  await page.getByRole('button', { name: 'Public nearby', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'Capacity including you (optional)', exact: true })
+    .fill('2');
+  await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'You’re hosting · you’re in' })).toBeDisabled();
   await page.getByRole('button', { name: 'Go back', exact: true }).click();
-  await page.getByRole('button', { name: 'View Coffee & a catch-up' }).click();
-  await page.getByRole('button', { name: 'Count me in' }).click();
-  await page.getByRole('button', { name: 'You’re in · tap to leave' }).click();
-  await expect(page.getByRole('button', { name: 'Count me in' })).toBeVisible();
+  await page.getByRole('button', { name: 'View as Noah' }).click();
+  await page.getByRole('button', { name: 'South Beach', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'View A sunny afternoon walk' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Sunset Harbour', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'View Coffee & a catch-up' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'View A sunny afternoon walk' }).click();
+  await page.getByRole('button', { name: 'Join meetup', exact: true }).click();
+  await expect(page.getByText('2 going', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Meetups', exact: true }).click();
+  await page.getByRole('button', { name: 'View as Noah' }).click();
+  await page.getByRole('button', { name: 'View A sunny afternoon walk' }).click();
+  await expect(page.getByRole('button', { name: 'Leave meetup', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Leave meetup', exact: true }).click();
+  await expect(page.getByText('1 going', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Join meetup', exact: true }).click();
+  await page.getByRole('button', { name: 'Go back', exact: true }).click();
+  await page.getByRole('button', { name: 'View as Maya' }).click();
+  await page.getByRole('button', { name: 'View A sunny afternoon walk' }).click();
+  await page.getByRole('button', { name: 'Edit meetup', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'Capacity including you (optional)', exact: true })
+    .fill('1');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('at least 2');
+  await page
+    .getByRole('textbox', { name: 'Capacity including you (optional)', exact: true })
+    .fill('3');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel meetup', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm cancellation', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Meetup cancelled', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Go back', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'View A sunny afternoon walk' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Joined', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'View A sunny afternoon walk' })).toBeVisible();
 });
 
 test('profile edits, dark mode, privacy and ghost mode', async ({ page }) => {
@@ -117,4 +156,88 @@ test('phone and tablet layouts keep navigation and sheets usable', async ({ page
     await expect(page.getByRole('textbox', { name: 'Search friends' })).toBeVisible();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
   }
+});
+
+for (const theme of ['Light', 'Dark'] as const) {
+  test(`responsive map, selected friend and meetup details · ${theme}`, async ({ page }) => {
+    test.setTimeout(90000);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByRole('button', { name: 'Your profile', exact: true }).click();
+    await page.getByRole('button', { name: theme, exact: true }).click();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    for (const viewport of [
+      { width: 360, height: 740 },
+      { width: 430, height: 932 },
+      { width: 768, height: 1024 },
+      { width: 1440, height: 960 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.reload();
+      const alex = page.getByRole('button', { name: 'Find Alex Rivera', exact: true });
+      await expect(alex).toBeVisible({ timeout: 25000 });
+      await page.screenshot({
+        path: `test-results/${theme.toLowerCase()}-${viewport.width}-map.png`,
+      });
+      await alex.click();
+      await expect(page.getByRole('button', { name: 'Say hello', exact: true })).toBeVisible();
+      if (viewport.width < 1000)
+        await expect(page.getByRole('button', { name: 'Zoom in', exact: true })).toHaveCount(0);
+      await page.screenshot({
+        path: `test-results/${theme.toLowerCase()}-${viewport.width}-friend.png`,
+      });
+      await page.getByRole('button', { name: 'Close friend card', exact: true }).click();
+      await page.getByRole('button', { name: 'Meetups', exact: true }).click();
+      await page.getByRole('button', { name: 'View Coffee & a catch-up', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Join meetup', exact: true })).toBeVisible();
+      await page.screenshot({
+        path: `test-results/${theme.toLowerCase()}-${viewport.width}-meetup.png`,
+      });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      await page.getByRole('button', { name: 'Close', exact: true }).click();
+    }
+  });
+}
+
+test('drag reversal, stationary touch, release and repeated gestures retain map interactions', async ({
+  page,
+}) => {
+  const alex = page.getByRole('button', { name: 'Find Alex Rivera', exact: true });
+  await expect(alex).toBeVisible({ timeout: 25000 });
+  const grip = page.getByLabel('One-handed map zoom. Slide up to zoom in, down to zoom out.');
+  const gripBox = (await grip.boundingBox())!;
+  const x = gripBox.x + 22,
+    y = gripBox.y + 32;
+  const original = (await alex.boundingBox())!.x;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.up();
+  expect((await alex.boundingBox())!.x).toBeCloseTo(original, 1);
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y - 80, { steps: 16 });
+    await expect.poll(async () => (await alex.boundingBox())!.x).toBeLessThan(original);
+    await page.mouse.move(x, y + 60, { steps: 24 });
+    await expect.poll(async () => (await alex.boundingBox())!.x).toBeGreaterThan(original);
+    await page.mouse.move(x, y, { steps: 12 });
+    await expect
+      .poll(async () => Math.abs((await alex.boundingBox())!.x - original))
+      .toBeLessThan(1);
+    await page.mouse.up();
+  }
+  // Pointer movement after release cannot keep moving the camera.
+  await page.mouse.move(x, y - 200, { steps: 12 });
+  expect((await alex.boundingBox())!.x).toBeCloseTo(original, 1);
+  // Provider gestures outside the grip still work, then selection opens a usable card.
+  const canvas = page.getByRole('region', { name: 'Map', exact: true });
+  await canvas.dblclick({ position: { x: 800, y: 450 } });
+  await page.mouse.move(500, 650);
+  await page.mouse.down();
+  await page.mouse.move(550, 680, { steps: 12 });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Recenter demo map' }).click();
+  await alex.click();
+  await expect(page.getByRole('button', { name: 'Say hello', exact: true })).toBeVisible();
 });

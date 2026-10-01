@@ -2,9 +2,9 @@
 
 **Your people. Your places. A little closer.**
 
-Zuno is a map-first social app prototype for iOS, Android, tablets, and the web. Open a little world around Miami Beach, tap a friend, say hello, or turn a spontaneous idea into a plan. The coral identity, typography, graphics, and interactions are original; no Zenly assets or source code are used.
+Zuno is a map-first social app prototype for iOS, Android, tablets, and the web. Open a little world around Miami Beach, tap a friend, say hello, or turn a spontaneous idea into a meetup. The coral identity, typography, graphics, and interactions are original; no Zenly assets or source code are used.
 
-This is **Phase 1**: a working frontend with fictional people and local persistence. There is no Supabase project, backend, real authentication, message delivery, moderation service, or location broadcast.
+This is **the second frontend milestone**: a working frontend with fictional people and local persistence. There is no Supabase project, backend, real authentication, message delivery, moderation service, or location broadcast.
 
 ## Get started
 
@@ -28,10 +28,13 @@ If your shell finds an old Node installation, activate Node 22 first. If a paren
 
 ## Try these flows
 
-- Tap an avatar → compact friend card → message, profile, or a plan.
-- Pan, pinch, double-tap, use zoom buttons, or drag the **slide** grip at the right edge. Recenter returns to the fictional Miami world. The grip owns only its small hit area.
+- Tap an avatar → compact friend card → message, profile, or a meetup.
+- Pan, pinch, double-tap, use zoom buttons, or drag the **slide** grip at the right edge. Recenter returns to the fictional Miami world. The grip starts from the current camera, ignores the first 6 points of movement, and changes one zoom level per 120 points after that. Up zooms in; down zooms out. It preserves the center, clamps to levels 3–18, and cancels on release, interruption, backgrounding, or a sheet opening. Buttons and browser arrow keys provide alternatives. The brief guidance appears once per local demo; reset restores it.
 - Open **People** to search friends, accept Noah’s incoming request, find Mia, send/cancel a request, or open safety controls on a profile.
-- Open **Plans** to join/leave a get-together. Create a plan with a title, description, a public place or approximate area, a relative time, and selected friends. Plans expire four hours after they start.
+- Open **Meetups** to discover, create, join, or leave. Creation supports an activity, title, description, editable local start/end date-times, a chosen public venue or approximate area, optional capacity, and friend invitations. The host counts toward capacity; invitations never join anyone automatically.
+- Choose **Friends** (default), **Invite-only**, or explicitly **Public nearby**. Browse Sunset Harbour or South Beach without granting device-location access. All/Friends/Public nearby/Today/Joined filters keep discovery small. Full meetups remain visible with joining disabled; ended/cancelled meetups leave discovery and stay in Joined for authorized members.
+- Hosts can edit or cancel upcoming meetups. Hosts cannot leave their own meetup. Edits cannot shrink capacity below membership or silently remove existing participants from the audience.
+- Try **View as Noah** inside Meetups to simulate a non-friend viewer. Create a public meetup as Maya, switch to Noah in the same area, then join. This switch affects only meetups, hides personal map pins/cards, and resets to Maya on reload; it is not authentication. If you accepted Noah’s friend request earlier, reset the demo to exercise the initial non-friend case.
 - Open your avatar to edit your name, bio, or status and select light, dark, or system appearance.
 - Open the shield for hidden/approximate/precise preferences, selected-friend one-hour sharing, ghost mode, and blocked people.
 
@@ -49,12 +52,12 @@ src/
     map/                   Map contract, native/web adapters, clustering, edge zoom
     friends/               Directory, requests, compact friend card
     chat/                  Conversation list and local messaging
-    plans/                 Plan cards, details, creation, participation
+    meetups/               Authorization, transactions, catalog, discovery, details and form
     profile/               Profile editing, theme, block/report/remove controls
     privacy/               Location preferences, temporary sharing, ghost mode
   screens/                 Map-first shell and responsive floating controls
   navigation/              Typed routes
-  repositories/            SocialRepository contract and mock adapter
+  repositories/            SocialRepository, mock adapter and v1 → v2 migration
   services/                Authentication and foreground location seams
   state/                   Application provider and domain reducer
   types/                   Domain models
@@ -67,11 +70,15 @@ scripts/                   Local web-worker preparation
 
 `AppProvider` accepts a `SocialRepository`, so screens do not import AsyncStorage or a database client. Writes are serialized to avoid stale snapshots overwriting newer edits. The snapshot adapter is intentionally small for the prototype; replace it with scoped backend operations and subscriptions when moving to multi-user data.
 
-Domain models cover User, Profile, Friendship, Location, LocationPrivacy, Presence, Conversation, Message, Plan, PlanParticipant, Block, Report, Notification, and opt-in discovery preferences. Presence is independent of precise location.
+`features/meetups/domain.ts` owns visible-list and authorized-ID reads, create/edit/cancel/join/leave transactions, accepted-friend audiences, explicit invitations, bidirectional host/viewer blocks, capacity, and lifecycle. The UI consumes these operations and action descriptions. Join/leave are separate, idempotent operations. `AppProvider` applies them synchronously against the latest snapshot so rapid taps cannot race stale renders. Joining never changes friendship, messaging, or location-sharing state.
+
+Snapshots now use schema version 2 while retaining the existing `zuno.demo.v1` storage key for compatibility. Migration converts saved plans to Friends meetups, retains joined members and the host, keeps interested users in invitations (not attendance), and preserves unrelated profiles, chats, relationships, and settings. Migration itself preserves privacy exactly; the existing startup policy separately resets location sharing to hidden and ends temporary sharing, while retaining ghost mode. Unknown legacy places become approximate meeting areas. This is a local prototype, not a secure multi-user storage system.
+
+Domain models cover User, Profile, Friendship, Location, LocationPrivacy, Presence, Conversation, Message, Meetup, MeetupDraft, Block, Report, Notification, and opt-in discovery preferences. Presence is independent of precise location.
 
 ## Map provider decision
 
-Native uses **react-native-maps**: Apple Maps on iOS and Google Maps on Android. Web uses **MapLibre GL** with CARTO / OpenStreetMap basemaps and visible attribution. Both implement `SocialMapProps` / `MapHandle`; provider logic is isolated from social UI. Avatar clustering has a shared screen-space algorithm (native uses a region-based projection approximation). Web is a useful preview, not a substitute for real-device gesture/performance QA.
+Native uses **react-native-maps**: Apple Maps on iOS and Google Maps on Android. Web uses **MapLibre GL** with CARTO / OpenStreetMap basemaps and visible attribution. Both implement `SocialMapProps` / `MapHandle`; provider logic is isolated from social UI. Avatar and meetup clustering use shared screen-space algorithms (native uses a region-based projection approximation). Compact meetup clusters open an authorized list of the grouped meetups. Mobile friend cards hide the zoom control to protect their actions; compact filter chips fit 360-point screens. Gesture recognition lives in `ZoomGrip`/`zoom.ts`, independently of provider commands. Native uses PanResponder; web uses pointer capture so drags continue beyond the grip, plus arrow-key controls. Each gesture reads its initial camera once. Updates coalesce to one immediate camera write per animation frame; generation tokens discard late native reads after cancellation. Android uses camera zoom; Apple uses altitude with the same exponential delta. Reduced motion disables sheet/friend-card transitions and browser recenter animation. Native recenter moves are immediate. Web is a useful preview, not a substitute for real-device gesture/performance QA.
 
 This keeps the initial experience accessible through Expo Go. Expo Maps is currently an alpha requiring development builds; Mapbox would add a token and native setup. Either can replace the native adapter later. See the [Expo map documentation](https://docs.expo.dev/versions/latest/sdk/map-view/) and [react-native-maps installation guide](https://github.com/react-native-maps/react-native-maps/blob/master/docs/installation.md).
 
@@ -97,17 +104,17 @@ The config plugin reads that variable at build time. Map client keys are embedde
 - No background location task or realtime broadcaster exists. Opening the app never asks for location permission.
 - `locationForViewer` is the future sharing-policy seam: strangers are denied; hidden removes coordinates; approximate snaps to a stable broad grid and replaces the place label; temporary access expires; ghost mode overrides everything.
 - Removing/blocking a friend revokes temporary access, removes map visibility, and prevents sending local messages. Reports are explicitly saved only locally.
-- No stranger discovery locations are seeded. Discovery is modeled but intentionally unimplemented.
+- No stranger live locations are seeded or exposed. Public discovery is limited to meetups explicitly published in the selected named area. Exact meeting coordinates come only from the public venue catalog; other selectable places are approximate areas. Meetup attendance remains independent of ghost mode and personal location preferences.
 - AsyncStorage stores fictional demo data, not credentials. Do not use it for future auth secrets or sensitive real-world location history.
 - Reserved `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` variables are unused. Never ship a service-role key or other privileged credential in the client.
-- The next backend phase must enforce relationships, consent, expiry, blocks, and plan audiences on the server with PostgreSQL RLS. Client checks alone are not a security boundary.
+- The next backend phase must enforce relationships, consent, expiry, blocks, capacity, and meetup audiences on the server with PostgreSQL RLS. Client checks alone are not a security boundary.
 
 ## Quality checks
 
 ```sh
 npm run typecheck
 npm run lint
-npm test                  # privacy, friendship, blocking, plans, clustering
+npm test                  # privacy, friendships, meetup policy, migration, zoom and clustering
 npm run format:check
 npm run check             # types + lint + domain tests
 npx playwright install chromium
@@ -116,11 +123,20 @@ npm run build:web
 npm run build:native      # iOS + Android JS/Hermes exports, not signed binaries
 ```
 
-Playwright covers map interaction, local chat persistence, incoming/outgoing requests, blocking, plan creation/participation, profile editing, themes, ghost mode, and phone/tablet layouts. It writes screenshots and failure traces to ignored `test-results/`. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally selects an existing Chromium binary.
+Playwright covers map interaction, local chat persistence, incoming/outgoing requests, blocking, public meetup creation with edited date-times, non-friend joining, area filters, capacity validation, host editing/cancellation, profile editing, themes, ghost mode, repeated/reversed drags, and phone/tablet/desktop layouts. It writes screenshots and failure traces to ignored `test-results/`. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally selects an existing Chromium binary.
 
-Validation during this milestone: strict types, ESLint, domain tests, browser journeys, and web/iOS/Android bundle exports. Native runtime validation remains pending: the local Xcode license is not accepted and no Android device/emulator is attached. An exported native bundle does not prove that native maps, permissions, or gestures work on a device, and no 60 FPS performance claim is made.
+Validation for this milestone (October 1, 2026):
 
-The current dependency audit reports 10 moderate transitive findings through Expo’s Xcode/UUID tooling, with no high or critical findings. The suggested forced fix would downgrade Expo to SDK 46; it has not been applied. Recheck on SDK updates.
+- Strict TypeScript, ESLint, formatting, 32 domain tests, and eight Playwright journeys. Screenshot checks cover 360×740 and 430×932 phones, 768×1024 tablet, and 1440×960 desktop, in light and dark themes, including selected friend cards and meetup details.
+- Web and iOS/Android JS/Hermes exports are checked separately from signed native builds.
+- Android API 36 emulator: Expo Go launches and renders Zuno’s interface, but the installed Expo Go host’s Google Maps authorization fails (`Google Android Maps SDK: Authorization failure` for `host.exp.exponent`), producing a blank basemap. A loading/unavailable message now keeps that failure explicit. Native map rendering and gesture/performance acceptance remain **unverified** until a working Expo Go map configuration or a development build with a correctly restricted Android Maps key is available.
+- iOS runtime: blocked by the unaccepted Xcode license. The owner must complete Xcode setup before simulator testing can proceed.
+
+Saved visual checks: [phone meetup](docs/screenshots/meetup-phone.png) and [dark phone friend card](docs/screenshots/friend-phone-dark.png).
+
+No native frame-rate claim is made. On-device gesture sensitivity, VoiceOver/TalkBack actions, real pinch interactions and provider projection accuracy still require native QA. The native date/time fields accept explicit local `YYYY-MM-DDTHH:mm` values; web uses native browser date/time inputs. A native picker can replace those fields later without changing the timestamp/domain contract.
+
+The baseline dependency audit reported 10 moderate transitive findings through Expo’s Xcode/UUID tooling, with no high or critical findings. Its suggested forced fix would downgrade Expo to SDK 46; it has not been applied. Recheck on SDK updates.
 
 ## Asset notes
 

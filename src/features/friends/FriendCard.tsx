@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Animated, View } from 'react-native';
 import { Avatar, Button, Icon, IconButton, Txt, ui } from '../../components/ui';
 import { useApp } from '../../state/AppContext';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { tokens } from '../../theme/tokens';
 import type { Navigate } from '../../navigation/routes';
 import type { Person } from '../../types/domain';
@@ -19,8 +20,13 @@ export function FriendCard({
   navigate: Navigate;
 }) {
   const { colors } = useApp();
+  const reduced = useReducedMotion();
   const [animation] = useState(() => new Animated.Value(0));
   useEffect(() => {
+    if (reduced) {
+      animation.setValue(1);
+      return;
+    }
     animation.setValue(0);
     Animated.spring(animation, {
       toValue: 1,
@@ -28,7 +34,7 @@ export function FriendCard({
       tension: 100,
       friction: 14,
     }).start();
-  }, [animation, person.user.id]);
+  }, [animation, person.user.id, reduced]);
   return (
     <Animated.View
       style={{
@@ -84,9 +90,9 @@ export function FriendCard({
         <Button
           kind="secondary"
           icon="plus"
-          onPress={() => navigate({ name: 'create-plan', friendId: person.user.id })}
+          onPress={() => navigate({ name: 'create-meetup', friendId: person.user.id })}
         >
-          Plan
+          Meetup
         </Button>
       </View>
       <Button

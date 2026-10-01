@@ -49,15 +49,14 @@ describe('social interactions', () => {
     });
     expect(s.privacy.temporary).toBeUndefined();
   });
-  it('joins/leaves once, rejects expired plans, and preserves other participants', () => {
-    let s = createSeed();
-    const before = s.plans[0].participants;
-    s = reducer(s, { type: 'join', planId: s.plans[0].id });
-    expect(s.plans[0].participants).toHaveLength(before.length + 1);
-    s = reducer(s, { type: 'join', planId: s.plans[0].id });
-    expect(s.plans[0].participants).toEqual(before);
-    s.plans[0].expiresAt = '2000-01-01';
-    s = reducer(s, { type: 'join', planId: s.plans[0].id });
-    expect(s.plans[0].participants).toEqual(before);
+  it('runs meetup policy inside the reducer, rejecting unauthorized commands', () => {
+    const state = createSeed();
+    const after = reducer(state, {
+      type: 'meetup',
+      actorId: 'noah',
+      now: Date.now(),
+      command: { operation: 'join', id: state.meetups[0].id },
+    });
+    expect(after).toBe(state);
   });
 });

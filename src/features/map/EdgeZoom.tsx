@@ -1,58 +1,99 @@
-import { useMemo } from 'react';
-import { PanResponder, View } from 'react-native';
-import { Icon, Txt } from '../../components/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { AppState, View } from 'react-native';
+import { IconButton, Txt } from '../../components/ui';
 import { useApp } from '../../state/AppContext';
 import { tokens } from '../../theme/tokens';
-/** Only this visible grip captures vertical drags; the rest of the map keeps its gestures. */
-export function EdgeZoom({ onZoom }: { onZoom: (delta: number) => void }) {
-  const { colors } = useApp();
-  const responder = useMemo(() => createZoomResponder(onZoom), [onZoom]);
+import { createZoomGesture } from './zoom';
+import { ZoomGrip } from './ZoomGrip';
+
+/** Only the grip owns drag gestures. Buttons remain keyboard/screen-reader accessible. */
+export function EdgeZoom({
+  onZoom,
+  onBegin,
+  onUpdate,
+  onEnd,
+}: {
+  onZoom(delta: number): void;
+  onBegin(): void;
+  onUpdate(delta: number): void;
+  onEnd(): void;
+}) {
+  const { colors, state, dispatch } = useApp();
+  const [active, setActive] = useState(false);
+  const hint = !state.edgeZoomHintSeen;
+  const gesture = useMemo(
+    () =>
+      createZoomGesture({
+        begin: () => {
+          setActive(true);
+          dispatch({ type: 'zoom-hint-seen' });
+          onBegin();
+        },
+        update: onUpdate,
+        end: () => {
+          setActive(false);
+          onEnd();
+        },
+      }),
+    [onBegin, onUpdate, onEnd, dispatch],
+  );
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') gesture.end();
+    });
+    return () => {
+      subscription.remove();
+      gesture.end();
+    };
+  }, [gesture]);
+  useEffect(() => {
+    if (!hint) return;
+    const timer = setTimeout(() => dispatch({ type: 'zoom-hint-seen' }), 6000);
+    return () => clearTimeout(timer);
+  }, [hint, dispatch]);
   return (
-    <View
-      {...responder.panHandlers}
-      accessible
-      accessibilityRole="adjustable"
-      accessibilityLabel="One-handed map zoom. Slide up to zoom in, down to zoom out."
-      accessibilityActions={[
-        { name: 'increment', label: 'Zoom in' },
-        { name: 'decrement', label: 'Zoom out' },
-      ]}
-      onAccessibilityAction={(e) => onZoom(e.nativeEvent.actionName === 'increment' ? 0.5 : -0.5)}
-      style={{
-        width: 42,
-        height: 126,
-        borderRadius: 23,
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: 13,
-        backgroundColor: colors.surface,
-        ...tokens.shadow,
-        ...{ touchAction: 'none' },
-      }}
-    >
-      <Icon name="plus" size={15} color={colors.muted} />
-      <View style={{ width: 4, height: 28, borderRadius: 3, backgroundColor: colors.line }} />
-      <Txt muted style={{ fontSize: 9 }}>
-        slide
-      </Txt>
-      <Icon name="minus" size={15} color={colors.muted} />
+    <View style={{ borderRadius: 24, backgroundColor: colors.surface, ...tokens.shadow }}>
+      {hint && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            right: 54,
+            top: 38,
+            width: 125,
+            padding: 12,
+            borderRadius: 14,
+            backgroundColor: colors.surface,
+          }}
+        >
+          <Txt style={{ fontSize: 11 }}>Slide up or down to zoom with one thumb</Txt>
+        </View>
+      )}
+      <IconButton
+        name="plus"
+        label="Zoom in"
+        onPress={() => onZoom(0.6)}
+        style={{ borderRadius: 24 }}
+      />
+      <ZoomGrip gesture={gesture} active={active} onStep={onZoom}>
+        <View
+          style={{
+            width: 4,
+            height: 26,
+            borderRadius: 3,
+            backgroundColor: active ? colors.accent : colors.line,
+          }}
+        />
+        <Txt style={{ fontSize: 9, color: active ? colors.accent : colors.muted }}>
+          {active ? 'zoom' : 'slide'}
+        </Txt>
+      </ZoomGrip>
+      <IconButton
+        name="minus"
+        label="Zoom out"
+        onPress={() => onZoom(-0.6)}
+        style={{ borderRadius: 24 }}
+      />
     </View>
   );
-}
-
-function createZoomResponder(onZoom: (delta: number) => void) {
-  let previous = 0;
-  return PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > Math.abs(g.dx),
-    onPanResponderGrant: () => {
-      previous = 0;
-    },
-    onPanResponderMove: (_, g) => {
-      const delta = (previous - g.dy) / 120;
-      previous = g.dy;
-      onZoom(delta);
-    },
-    onPanResponderTerminationRequest: () => true,
-  });
 }

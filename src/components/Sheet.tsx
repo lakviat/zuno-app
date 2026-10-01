@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../state/AppContext';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { tokens } from '../theme/tokens';
 import { IconButton, Txt, ui } from './ui';
 
@@ -30,11 +31,18 @@ export function Sheet({
   scroll?: boolean;
 }>) {
   const { colors, toast } = useApp();
+  const reduced = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const wide = width >= 720;
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal
+      visible
+      transparent
+      animationType={reduced ? 'none' : 'fade'}
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{

@@ -1,4 +1,5 @@
-import type { AppSnapshot, Person, Place } from '../types/domain';
+import { migrateSnapshot } from '../repositories/migration';
+import type { AppSnapshot, LegacySnapshot, Person, Place } from '../types/domain';
 
 export const places: Place[] = [
   {
@@ -23,7 +24,7 @@ export const places: Place[] = [
     precision: 'precise',
   },
 ];
-export function createSeed(): AppSnapshot {
+export function createLegacySeed(): LegacySnapshot {
   const now = Date.now();
   const iso = (minutes = 0) => new Date(now + minutes * 60000).toISOString();
   const makePerson = (
@@ -258,4 +259,8 @@ export function createSeed(): AppSnapshot {
     theme: 'light',
     discovery: { optedIn: false, interests: [] },
   };
+}
+
+export function createSeed(): AppSnapshot {
+  return migrateSnapshot(createLegacySeed());
 }

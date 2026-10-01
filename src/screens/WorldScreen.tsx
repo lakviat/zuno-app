@@ -10,29 +10,59 @@ import { EdgeZoom } from '../features/map/EdgeZoom';
 import { FriendCard } from '../features/friends/FriendCard';
 import { FriendsScreen } from '../features/friends/FriendsScreen';
 import { ChatScreen } from '../features/chat/ChatScreen';
-import { PlansScreen, CreatePlanScreen } from '../features/plans/PlansScreen';
+import { MeetupsScreen } from '../features/meetups/MeetupsScreen';
+import { MeetupForm } from '../features/meetups/MeetupForm';
+import { demoAreas } from '../features/meetups/places';
+import { listVisibleMeetups } from '../features/meetups/domain';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { PrivacyScreen } from '../features/privacy/PrivacyScreen';
 import { BottomNav, Header, MobilePeoplePill, WorldPanel } from './HomeChrome';
 import type { Route } from '../navigation/routes';
-import { isBlocked } from '../utils/privacy';
 import { tokens } from '../theme/tokens';
 
 export function WorldScreen() {
-  const { now, ready, friends, me, state, dark, colors, toast, dispatch } = useApp();
+  const {
+    now,
+    ready,
+    friends,
+    me,
+    state,
+    dark,
+    colors,
+    toast,
+    dispatch,
+    meetupViewerId,
+    setMeetupViewerId,
+    meetupAreaId,
+  } = useApp();
   const [route, setRoute] = useState<Route>({ name: 'map' });
   const [selected, setSelected] = useState<string>();
-  const [filter, setFilter] = useState<'all' | 'free' | 'plans'>('all');
+  const [filter, setFilter] = useState<'all' | 'free' | 'meetups'>('all');
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const map = useRef<MapHandle>(null);
+  const previousArea = useRef(meetupAreaId);
+  useEffect(() => {
+    if (previousArea.current !== meetupAreaId) {
+      previousArea.current = meetupAreaId;
+      map.current?.recenter(demoAreas.find((a) => a.id === meetupAreaId)?.coordinate);
+    }
+  }, [meetupAreaId]);
   const wide = width >= 1000;
   const top = insets.top + (wide ? 110 : 88);
   const bottom = Math.max(insets.bottom, wide ? 26 : 16);
   const zoomMap = useCallback((delta: number) => map.current?.zoomBy(delta), []);
-  const navigate = useCallback((next: Route) => {
-    setRoute(next);
-  }, []);
+  const beginZoom = useCallback(() => map.current?.beginZoom(), []);
+  const updateZoom = useCallback((delta: number) => map.current?.updateZoom(delta), []);
+  const endZoom = useCallback(() => map.current?.endZoom(), []);
+  const navigate = useCallback(
+    (next: Route) => {
+      map.current?.endZoom();
+      if (next.name === 'create-meetup' && next.friendId) setMeetupViewerId(state.currentUserId);
+      setRoute(next);
+    },
+    [setMeetupViewerId, state.currentUserId],
+  );
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (route.name !== 'map') {
@@ -47,13 +77,13 @@ export function WorldScreen() {
     });
     return () => sub.remove();
   }, [route.name, selected]);
-  const person = friends.find((f) => f.user.id === selected);
-  const plans = state.plans.filter(
-    (p) => Date.parse(p.expiresAt) > now && !isBlocked(state, p.creatorId),
-  );
+  const personalView = meetupViewerId === state.currentUserId;
+  const person = personalView ? friends.find((f) => f.user.id === selected) : undefined;
+  const meetups = listVisibleMeetups(state, meetupViewerId, { now, areaId: meetupAreaId });
   const selectPerson = (id: string) => {
+    map.current?.endZoom();
     setSelected(id);
-    if (filter === 'plans') setFilter('all');
+    if (filter === 'meetups') setFilter('all');
   };
   if (!ready)
     return (
@@ -76,17 +106,22 @@ export function WorldScreen() {
       <SocialMap
         ref={map}
         people={
-          filter === 'plans' ? [] : friends.filter((f) => filter !== 'free' || f.presence.freeNow)
+          filter === 'meetups' || meetupViewerId !== state.currentUserId
+            ? []
+            : friends.filter((f) => filter !== 'free' || f.presence.freeNow)
         }
-        me={me}
-        plans={plans}
+        me={meetupViewerId === state.currentUserId ? me : { ...me, location: undefined }}
+        meetups={meetups}
         dark={dark}
         selectedId={selected}
         onPersonPress={selectPerson}
-        onPlanPress={(planId) => navigate({ name: 'plans', planId })}
+        onMeetupPress={(meetupId) => navigate({ name: 'meetups', meetupId })}
+        onMeetupClusterPress={(clusterIds) => navigate({ name: 'meetups', clusterIds })}
       />
       <Header wide={wide} top={insets.top} navigate={navigate} />
-      {wide && <WorldPanel top={top} navigate={navigate} selectPerson={selectPerson} />}
+      {wide && personalView && (
+        <WorldPanel top={top} navigate={navigate} selectPerson={selectPerson} />
+      )}
       <View
         style={[
           ui.row,
@@ -101,24 +136,37 @@ export function WorldScreen() {
         ]}
       >
         <Chip
+          compact={!wide}
           label="Everyone"
           icon="users"
           active={filter === 'all'}
           onPress={() => setFilter('all')}
         />
         <Chip
+          compact={!wide}
           label="Free now"
           icon="zap"
           active={filter === 'free'}
           onPress={() => setFilter('free')}
         />
         <Chip
-          label="Little plans"
+          label="Meetups"
+          accessibilityLabel="Meetups nearby"
+          compact={!wide}
           icon="sun"
-          active={filter === 'plans'}
-          onPress={() => setFilter('plans')}
+          active={filter === 'meetups'}
+          onPress={() => setFilter('meetups')}
         />
       </View>
+      {meetupViewerId !== state.currentUserId && (
+        <View style={{ position: 'absolute', top: top + 52, alignSelf: 'center' }}>
+          <Chip
+            label="Meetups preview · Noah"
+            icon="eye"
+            onPress={() => navigate({ name: 'meetups' })}
+          />
+        </View>
+      )}
       {wide && (
         <View
           style={[
@@ -141,44 +189,25 @@ export function WorldScreen() {
           </Txt>
         </View>
       )}
-      <View
-        style={{
-          position: 'absolute',
-          right: wide ? 28 : 12,
-          top: '43%',
-          gap: 10,
-          alignItems: 'center',
-        }}
-      >
-        <EdgeZoom onZoom={zoomMap} />
-      </View>
-      <View
-        style={{
-          position: 'absolute',
-          right: wide ? 28 : 16,
-          bottom: bottom + (wide ? 94 : 140),
-          gap: 8,
-        }}
-      >
-        <IconButton
-          name="plus"
-          label="Zoom in"
-          onPress={() => map.current?.zoomBy(0.6)}
-          style={tokens.shadow}
-        />
-        <IconButton
-          name="minus"
-          label="Zoom out"
-          onPress={() => map.current?.zoomBy(-0.6)}
-          style={tokens.shadow}
-        />
-        <IconButton
-          name="navigation"
-          label="Recenter demo map"
-          onPress={() => map.current?.recenter()}
-          style={tokens.shadow}
-        />
-      </View>
+      {route.name === 'map' && (!person || wide) && (
+        <View
+          style={{
+            position: 'absolute',
+            right: Math.max(insets.right + 16, wide ? 28 : 16),
+            top: '39%',
+            gap: 10,
+            alignItems: 'center',
+          }}
+        >
+          <EdgeZoom onZoom={zoomMap} onBegin={beginZoom} onUpdate={updateZoom} onEnd={endZoom} />
+          <IconButton
+            name="navigation"
+            label="Recenter demo map"
+            onPress={() => map.current?.recenter()}
+            style={tokens.shadow}
+          />
+        </View>
+      )}
       {person ? (
         <FriendCard
           person={person}
@@ -188,7 +217,7 @@ export function WorldScreen() {
           onClose={() => setSelected(undefined)}
         />
       ) : (
-        !wide && <MobilePeoplePill bottom={bottom + 88} navigate={navigate} />
+        !wide && personalView && <MobilePeoplePill bottom={bottom + 88} navigate={navigate} />
       )}
       <BottomNav wide={wide} bottom={bottom} navigate={navigate} />
       {wide && (
@@ -233,9 +262,18 @@ export function WorldScreen() {
       )}
       {route.name === 'friends' && <FriendsScreen navigate={navigate} />}
       {route.name === 'inbox' && <ChatScreen friendId={route.friendId} navigate={navigate} />}
-      {route.name === 'plans' && <PlansScreen planId={route.planId} navigate={navigate} />}
-      {route.name === 'create-plan' && (
-        <CreatePlanScreen friendId={route.friendId} navigate={navigate} />
+      {route.name === 'meetups' && (
+        <MeetupsScreen
+          meetupId={route.meetupId}
+          clusterIds={route.clusterIds}
+          navigate={navigate}
+        />
+      )}
+      {route.name === 'create-meetup' && (
+        <MeetupForm key="create" friendId={route.friendId} navigate={navigate} />
+      )}
+      {route.name === 'edit-meetup' && (
+        <MeetupForm key={route.meetupId} meetupId={route.meetupId} navigate={navigate} />
       )}
       {route.name === 'profile' && (
         <ProfileScreen key={route.userId ?? 'me'} userId={route.userId} navigate={navigate} />

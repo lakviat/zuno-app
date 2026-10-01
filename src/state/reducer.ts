@@ -1,9 +1,11 @@
-import type { AppSnapshot, LocationPrivacy, Message, Plan, Profile } from '../types/domain';
+import { executeMeetup, type MeetupCommand } from '../features/meetups/domain';
+import type { AppSnapshot, LocationPrivacy, Message, Profile } from '../types/domain';
 import { isBlocked, isFriend } from '../utils/privacy';
 
 export type Action =
   | { type: 'hydrate'; snapshot: AppSnapshot }
   | { type: 'privacy'; value: LocationPrivacy }
+  | { type: 'zoom-hint-seen' }
   | { type: 'theme'; value: AppSnapshot['theme'] }
   | { type: 'profile'; value: Partial<Profile>; status: string }
   | {
@@ -14,9 +16,15 @@ export type Action =
     }
   | { type: 'message'; message: Message; friendId: string }
   | { type: 'read'; conversationId: string }
-  | { type: 'plan'; plan: Plan }
-  | { type: 'join'; planId: string }
-  | { type: 'report'; subjectId: string; reason: string; id: string; now: string };
+  | { type: 'meetup'; actorId: string; command: MeetupCommand; now: number }
+  | {
+      type: 'report';
+      reporterId?: string;
+      subjectId: string;
+      reason: string;
+      id: string;
+      now: string;
+    };
 
 export function reducer(state: AppSnapshot, action: Action): AppSnapshot {
   switch (action.type) {
@@ -27,6 +35,8 @@ export function reducer(state: AppSnapshot, action: Action): AppSnapshot {
         ...state,
         privacy: action.value.ghostMode ? { ...action.value, temporary: undefined } : action.value,
       };
+    case 'zoom-hint-seen':
+      return state.edgeZoomHintSeen ? state : { ...state, edgeZoomHintSeen: true };
     case 'theme':
       return { ...state, theme: action.value };
     case 'profile':
@@ -138,32 +148,10 @@ export function reducer(state: AppSnapshot, action: Action): AppSnapshot {
           c.id === action.conversationId ? { ...c, unreadCount: 0 } : c,
         ),
       };
-    case 'plan':
-      return action.plan.title.trim() &&
-        Date.parse(action.plan.expiresAt) > Date.parse(action.plan.startsAt)
-        ? { ...state, plans: [...state.plans, action.plan] }
-        : state;
-    case 'join':
-      return {
-        ...state,
-        plans: state.plans.map((p) =>
-          p.id !== action.planId ||
-          Date.parse(p.expiresAt) < Date.now() ||
-          isBlocked(state, p.creatorId)
-            ? p
-            : {
-                ...p,
-                participants: p.participants.some(
-                  (part) => part.userId === state.currentUserId && part.status === 'joined',
-                )
-                  ? p.participants.filter((part) => part.userId !== state.currentUserId)
-                  : [
-                      ...p.participants.filter((part) => part.userId !== state.currentUserId),
-                      { userId: state.currentUserId, status: 'joined' },
-                    ],
-              },
-        ),
-      };
+    case 'meetup': {
+      const result = executeMeetup(state, action.actorId, action.command, action.now);
+      return result.ok ? result.snapshot : state;
+    }
     case 'report':
       return {
         ...state,
@@ -171,7 +159,7 @@ export function reducer(state: AppSnapshot, action: Action): AppSnapshot {
           ...state.reports,
           {
             id: action.id,
-            reporterId: state.currentUserId,
+            reporterId: action.reporterId ?? state.currentUserId,
             subjectId: action.subjectId,
             reason: action.reason,
             createdAt: action.now,

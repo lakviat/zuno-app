@@ -1,22 +1,36 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useReducer,
-  useState,
-} from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import { createSeed } from '../mocks/seed';
 import { MockSocialRepository } from '../repositories/MockSocialRepository';
 import type { SocialRepository } from '../repositories/SocialRepository';
 import { palette } from '../theme/tokens';
 import { isBlocked, isFriend } from '../utils/privacy';
-import { reducer } from './reducer';
+import { executeMeetup, type MeetupCommand } from '../features/meetups/domain';
+import { reducer, type Action } from './reducer';
 
 const defaultRepository = new MockSocialRepository();
 function useAppState(repository: SocialRepository) {
-  const [state, dispatch] = useReducer(reducer, undefined, createSeed);
+  const [state, setState] = useState(createSeed);
+  const latest = useRef(state);
+  const dispatch = useCallback((action: Action) => {
+    const next = reducer(latest.current, action);
+    latest.current = next;
+    setState(next);
+  }, []);
+  // This preview actor only affects meetups. It never impersonates a personal location session.
+  const [meetupViewerId, setMeetupViewerId] = useState('me');
+  const [meetupAreaId, setMeetupAreaId] = useState('sunset-harbour');
+  const runMeetup = useCallback(
+    (command: MeetupCommand) => {
+      const result = executeMeetup(latest.current, meetupViewerId, command);
+      if (result.ok) {
+        latest.current = result.snapshot;
+        setState(result.snapshot);
+      }
+      return result;
+    },
+    [meetupViewerId],
+  );
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15000);
@@ -41,7 +55,7 @@ function useAppState(repository: SocialRepository) {
     return () => {
       alive = false;
     };
-  }, [repository]);
+  }, [repository, dispatch]);
   useEffect(() => {
     if (ready)
       repository.save(state).catch(() => setToast('Changes could not be saved on this device.'));
@@ -60,9 +74,14 @@ function useAppState(repository: SocialRepository) {
     await repository.clear();
     dispatch({ type: 'hydrate', snapshot: createSeed() });
     setToast('Your local demo has been reset.');
-  }, [repository]);
+  }, [repository, dispatch]);
   return {
     state,
+    meetupViewerId,
+    setMeetupViewerId,
+    meetupAreaId,
+    setMeetupAreaId,
+    runMeetup,
     now,
     dispatch,
     ready,

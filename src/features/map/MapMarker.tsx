@@ -2,7 +2,7 @@ import { Pressable, View } from 'react-native';
 import { Avatar, Txt } from '../../components/ui';
 import { useApp } from '../../state/AppContext';
 import { tokens } from '../../theme/tokens';
-import type { Person, Plan } from '../../types/domain';
+import type { Person, Meetup } from '../../types/domain';
 
 export function FriendMarker({
   person,
@@ -94,12 +94,12 @@ export function FriendMarker({
     </Pressable>
   );
 }
-export function PlanMarker({
-  plan,
+export function MeetupMarker({
+  meetup,
   onPress,
   compact = false,
 }: {
-  plan: Plan;
+  meetup: Meetup;
   onPress: () => void;
   compact?: boolean;
 }) {
@@ -107,7 +107,7 @@ export function PlanMarker({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Open plan ${plan.title}`}
+      accessibilityLabel={`Open meetup ${meetup.title}`}
       onPress={onPress}
       style={{
         backgroundColor: colors.surface,
@@ -121,11 +121,38 @@ export function PlanMarker({
         ...tokens.shadow,
       }}
     >
-      <Txt style={{ fontSize: 19 }}>{plan.emoji}</Txt>
-      <Txt weight="bold" style={{ fontSize: 11 }}>
-        {compact ? plan.participants.length : plan.title}
+      <Txt style={{ fontSize: 19 }}>{meetup.emoji}</Txt>
+      <Txt weight="bold" numberOfLines={1} style={{ fontSize: 11, maxWidth: 165 }}>
+        {compact ? meetup.participantIds.length : meetup.title}
       </Txt>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent }} />
+    </Pressable>
+  );
+}
+
+export function MeetupClusterMarker({ count, onPress }: { count: number; onPress(): void }) {
+  const { colors } = useApp();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Browse ${count} nearby meetups`}
+      onPress={onPress}
+      style={{
+        minWidth: 56,
+        minHeight: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 10,
+        backgroundColor: colors.accent,
+        borderWidth: 2,
+        borderColor: colors.surface,
+        borderRadius: 16,
+        ...tokens.shadow,
+      }}
+    >
+      <Txt weight="bold" style={{ color: 'white', fontSize: 16 }}>
+        ☀ {count}
+      </Txt>
     </Pressable>
   );
 }

@@ -196,11 +196,15 @@ export function IconButton({
 }
 export function Chip({
   label,
+  accessibilityLabel,
+  compact = false,
   icon,
   active,
   onPress,
 }: {
   label: string;
+  accessibilityLabel?: string;
+  compact?: boolean;
   icon?: IconName;
   active?: boolean;
   onPress: () => void;
@@ -209,12 +213,12 @@ export function Chip({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ selected: active }}
       onPress={onPress}
       style={({ pressed }) => ({
         minHeight: 40,
-        paddingHorizontal: 15,
+        paddingHorizontal: compact ? 12 : 15,
         borderRadius: 99,
         flexDirection: 'row',
         alignItems: 'center',

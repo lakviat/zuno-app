@@ -1,10 +1,20 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
 import { Map as LibreMap, setWorkerUrl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Avatar, Txt } from '../../components/ui';
 import { useApp } from '../../state/AppContext';
-import { FriendMarker, PlanMarker } from './MapMarker';
+import { FriendMarker, MeetupMarker, MeetupClusterMarker } from './MapMarker';
+import { createZoomCamera } from './zoom';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { clusterMeetups } from './meetupClusters';
 import { clusterPeople } from './clusters';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
 
@@ -18,6 +28,21 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
   const [loaded, setLoaded] = useState(false);
   const { colors } = useApp();
   const dark = props.dark;
+  const reduced = useReducedMotion();
+  const zoom = useMemo(
+    () =>
+      createZoomCamera(
+        () => {
+          const m = map.current;
+          if (!m) throw new Error('Map not ready');
+          m.stop();
+          return { zoom: m.getZoom(), center: m.getCenter() };
+        },
+        (start, level) => map.current?.jumpTo({ center: start.center, zoom: level }),
+      ),
+    [],
+  );
+  useEffect(() => () => zoom.end(), [zoom]);
   useEffect(() => {
     if (!container.current) return;
     let instance: LibreMap;
@@ -77,21 +102,24 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
     ref,
     () => ({
       recenter(coordinate = MIAMI) {
+        zoom.end();
         map.current?.easeTo({
           center: [
             coordinate === MIAMI && window.innerWidth < 720 ? -80.138 : coordinate.longitude,
             coordinate.latitude,
           ],
           zoom: coordinate === MIAMI ? (window.innerWidth < 720 ? 12.65 : 13.25) : 14,
-          duration: 550,
+          duration: reduced ? 0 : 550,
         });
       },
-      zoomBy(delta) {
-        const m = map.current;
-        if (m) m.jumpTo({ zoom: Math.max(3, Math.min(18, m.getZoom() + delta)) });
+      zoomBy: (delta) => {
+        void zoom.step(delta);
       },
+      beginZoom: zoom.begin,
+      updateZoom: zoom.update,
+      endZoom: zoom.end,
     }),
-    [],
+    [zoom, reduced],
   );
   const project = (latitude: number, longitude: number) =>
     map.current?.project([longitude, latitude]);
@@ -120,21 +148,38 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
           pointerEvents="box-none"
           style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}
         >
-          {props.plans.map((plan) => {
-            const p = project(plan.place.coordinate.latitude, plan.place.coordinate.longitude);
-            return p ? (
-              <View
-                key={plan.id}
-                style={{ position: 'absolute', left: p.x - (compact ? 28 : 75), top: p.y + 16 }}
-              >
-                <PlanMarker
-                  compact={compact}
-                  plan={plan}
-                  onPress={() => props.onPlanPress(plan.id)}
+          {clusterMeetups(
+            props.meetups.flatMap((meetup) => {
+              const point = project(
+                meetup.place.coordinate.latitude,
+                meetup.place.coordinate.longitude,
+              );
+              return point ? [{ meetup, x: point.x, y: point.y }] : [];
+            }),
+            compact ? 70 : 170,
+          ).map((group) => (
+            <View
+              key={group.meetups.map((m) => m.id).join(':')}
+              style={{
+                position: 'absolute',
+                left: group.x - (compact || group.meetups.length > 1 ? 28 : 75),
+                top: group.y + 16,
+              }}
+            >
+              {group.meetups.length > 1 ? (
+                <MeetupClusterMarker
+                  count={group.meetups.length}
+                  onPress={() => props.onMeetupClusterPress(group.meetups.map((m) => m.id))}
                 />
-              </View>
-            ) : null;
-          })}
+              ) : (
+                <MeetupMarker
+                  compact={compact}
+                  meetup={group.meetups[0]}
+                  onPress={() => props.onMeetupPress(group.meetups[0].id)}
+                />
+              )}
+            </View>
+          ))}
           {clusters.map((c) => (
             <View key={c.id} style={{ position: 'absolute', left: c.x - 70, top: c.y - 72 }}>
               {c.people.length === 1 ? (
@@ -150,7 +195,14 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
                   accessibilityLabel={`Zoom into ${c.people.length} friends`}
                   onPress={() => {
                     const m = map.current;
-                    if (m) m.easeTo({ center: m.unproject([c.x, c.y]), zoom: m.getZoom() + 1.5 });
+                    if (m) {
+                      zoom.end();
+                      m.easeTo({
+                        center: m.unproject([c.x, c.y]),
+                        zoom: Math.min(18, m.getZoom() + 1.5),
+                        duration: reduced ? 0 : 350,
+                      });
+                    }
                   }}
                   style={{
                     marginLeft: 42,
@@ -216,7 +268,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
         >
           <Txt>
             {failed
-              ? 'Map unavailable. Your friends and plans are still here.'
+              ? 'Map unavailable. Your friends and meetups are still here.'
               : 'Finding your little corner of the world…'}
           </Txt>
         </View>

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { migrateSnapshot } from './migration';
 import { createSeed } from '../mocks/seed';
-import type { AppSnapshot } from '../types/domain';
+import type { AppSnapshot, LegacySnapshot } from '../types/domain';
 import type { SocialRepository } from './SocialRepository';
 
 const KEY = 'zuno.demo.v1';
@@ -10,21 +11,25 @@ export class MockSocialRepository implements SocialRepository {
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return createSeed();
     try {
-      const data = JSON.parse(raw) as AppSnapshot;
+      const data = JSON.parse(raw) as AppSnapshot | LegacySnapshot;
       if (
-        data.version !== 1 ||
+        (data.version !== 1 && data.version !== 2) ||
         !Array.isArray(data.people) ||
         !data.people.some((p) => p.user.id === data.currentUserId) ||
         !data.privacy ||
         !Array.isArray(data.friendships) ||
         !Array.isArray(data.messages) ||
-        !Array.isArray(data.plans) ||
+        !(data.version === 1 ? Array.isArray(data.plans) : Array.isArray(data.meetups)) ||
         !Array.isArray(data.blocks) ||
         !Array.isArray(data.reports)
       )
         return createSeed();
       // Restarting the demo never silently resumes precise or temporary sharing.
-      return { ...data, privacy: { ...data.privacy, mode: 'hidden', temporary: undefined } };
+      const migrated = migrateSnapshot(data);
+      return {
+        ...migrated,
+        privacy: { ...migrated.privacy, mode: 'hidden', temporary: undefined },
+      };
     } catch {
       return createSeed();
     }

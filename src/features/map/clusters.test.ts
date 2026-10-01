@@ -1,3 +1,4 @@
+import { clusterMeetups } from './meetupClusters';
 import { expect, it } from 'vitest';
 import { createSeed } from '../../mocks/seed';
 import { clusterPeople } from './clusters';
@@ -12,4 +13,14 @@ it('clusters adjacent avatars and retains every person', () => {
   expect(result[0].people).toHaveLength(2);
   expect(result[0].x).toBe(25);
   expect(result.flatMap((c) => c.people)).toHaveLength(3);
+});
+
+it('groups overlapping meetups into a single reachable target', () => {
+  const [first, second] = createSeed().meetups;
+  const groups = clusterMeetups([
+    { meetup: first, x: 100, y: 100 },
+    { meetup: second, x: 104, y: 102 },
+  ]);
+  expect(groups).toHaveLength(1);
+  expect(groups[0].meetups.map((m) => m.id)).toEqual([first.id, second.id]);
 });

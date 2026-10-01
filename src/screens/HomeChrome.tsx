@@ -188,8 +188,8 @@ export function WorldPanel({
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Create a spontaneous plan"
-          onPress={() => navigate({ name: 'create-plan' })}
+          accessibilityLabel="Create a spontaneous meetup"
+          onPress={() => navigate({ name: 'create-meetup' })}
           style={{
             backgroundColor: colors.accentSoft,
             borderRadius: 24,
@@ -237,12 +237,13 @@ export function BottomNav({
 }) {
   const { state, colors } = useApp();
   const unread = state.conversations.reduce((n, c) => n + c.unreadCount, 0);
-  const items: { name: 'map' | 'friends' | 'plans' | 'inbox'; title: string; icon: IconName }[] = [
-    { name: 'map', title: 'Your world', icon: 'map' },
-    { name: 'friends', title: 'People', icon: 'users' },
-    { name: 'plans', title: 'Plans', icon: 'sun' },
-    { name: 'inbox', title: 'Messages', icon: 'message-circle' },
-  ];
+  const items: { name: 'map' | 'friends' | 'meetups' | 'inbox'; title: string; icon: IconName }[] =
+    [
+      { name: 'map', title: 'Your world', icon: 'map' },
+      { name: 'friends', title: 'People', icon: 'users' },
+      { name: 'meetups', title: 'Meetups', icon: 'sun' },
+      { name: 'inbox', title: 'Messages', icon: 'message-circle' },
+    ];
   return (
     <View
       style={{

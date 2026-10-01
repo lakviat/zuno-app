@@ -116,17 +116,57 @@ export interface DiscoveryPreferences {
   interests: string[];
 }
 export interface AppSnapshot {
-  version: 1;
+  version: 2;
+  edgeZoomHintSeen?: boolean;
   currentUserId: ID;
   people: Person[];
   friendships: Friendship[];
   conversations: Conversation[];
   messages: Message[];
-  plans: Plan[];
+  meetups: Meetup[];
   blocks: Block[];
   reports: Report[];
   notifications: Notification[];
   privacy: LocationPrivacy;
   theme: 'light' | 'dark' | 'system';
   discovery: DiscoveryPreferences;
+}
+
+/** v1 is retained only as the input to the non-destructive migration. */
+export type LegacySnapshot = Omit<AppSnapshot, 'version' | 'meetups'> & {
+  version: 1;
+  plans: Plan[];
+};
+export type MeetupVisibility = 'friends' | 'invite-only' | 'public';
+export interface MeetupPlace extends Place {
+  kind: 'public-venue' | 'area';
+  areaId: string;
+}
+export interface Meetup {
+  id: ID;
+  hostId: ID;
+  title: string;
+  description: string;
+  emoji: string;
+  place: MeetupPlace;
+  startsAt: string;
+  endsAt: string;
+  visibility: MeetupVisibility;
+  invitedUserIds: ID[];
+  participantIds: ID[];
+  capacity?: number;
+  status: 'scheduled' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+}
+export interface MeetupDraft {
+  title: string;
+  description: string;
+  emoji: string;
+  placeId: ID;
+  startsAt: string;
+  endsAt: string;
+  visibility: MeetupVisibility;
+  invitedUserIds: ID[];
+  capacity?: number;
 }
