@@ -1,0 +1,50 @@
+export const palette = {
+  light: {
+    background: '#F7F6F2',
+    surface: '#FFFFFF',
+    raised: '#F5F4F0',
+    ink: '#282D2A',
+    muted: '#858A83',
+    line: '#EAECE5',
+    accent: '#F26B50',
+    accentSoft: '#FFF0EA',
+    green: '#3C8C67',
+    greenSoft: '#EDF5E9',
+    water: '#C4DFDD',
+    overlay: 'rgba(35,43,39,0.25)',
+  },
+  dark: {
+    background: '#1B2526',
+    surface: '#263232',
+    raised: '#33413F',
+    ink: '#F4F3E9',
+    muted: '#A4B4AD',
+    line: '#40504A',
+    accent: '#FF8B6D',
+    accentSoft: '#49382F',
+    green: '#95CBAA',
+    greenSoft: '#344A3C',
+    water: '#1D363B',
+    overlay: 'rgba(0,0,0,0.5)',
+  },
+};
+export const tokens = {
+  space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, huge: 48 },
+  radius: { sm: 12, md: 18, lg: 24, xl: 32, pill: 999 },
+  font: {
+    body: 'DMSans_400Regular',
+    medium: 'DMSans_500Medium',
+    bold: 'DMSans_700Bold',
+    display: 'Outfit_600SemiBold',
+    heavy: 'Outfit_700Bold',
+  },
+  motion: { fast: 160, normal: 260, slow: 480 },
+  shadow: {
+    shadowColor: '#253D35',
+    shadowOpacity: 0.09,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+};
+export type Colors = typeof palette.light;
