@@ -59,12 +59,15 @@ test('creates a public meetup, joins as a non-friend, persists, edits and cancel
   page,
 }) => {
   await page.getByRole('button', { name: 'Meetups', exact: true }).click();
+  await page.getByRole('button', { name: 'Sunset Harbour', exact: true }).click();
   await page.getByRole('button', { name: 'Create a meetup', exact: true }).click();
+  await page.getByRole('button', { name: 'Set meetup here', exact: true }).click();
   await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Add a title');
   await page
     .getByRole('textbox', { name: 'Meetup title', exact: true })
     .fill('A sunny afternoon walk');
+  await page.getByRole('button', { name: 'Custom date/time', exact: true }).click();
   await page.getByLabel('Starts', { exact: true }).fill('2099-10-02T10:00');
   await page.getByLabel('Ends', { exact: true }).fill('2099-10-02T12:00');
   await page.getByRole('button', { name: 'Public nearby', exact: true }).click();
@@ -144,7 +147,9 @@ test('meetup draft keeps its duration and requires an explicit discard', async (
   await page.getByRole('button', { name: 'Meetups', exact: true }).click();
   await page.getByRole('button', { name: 'South Beach', exact: true }).click();
   await page.getByRole('button', { name: 'Create a meetup', exact: true }).click();
+  await page.getByRole('button', { name: 'Set meetup here', exact: true }).click();
   await page.getByRole('textbox', { name: 'Meetup title', exact: true }).fill('Draft to keep');
+  await page.getByRole('button', { name: 'Custom date/time', exact: true }).click();
   await page.getByLabel('Starts', { exact: true }).fill('2099-10-02T23:30');
   await expect(page.getByLabel('Ends', { exact: true })).toHaveValue('2099-10-03T00:30');
   await page.getByRole('button', { name: 'Close', exact: true }).click();
@@ -157,10 +162,15 @@ test('meetup draft keeps its duration and requires an explicit discard', async (
   await page.getByRole('button', { name: 'Discard changes' }).click();
   await expect(page.getByRole('button', { name: 'View Draft to keep' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Create a meetup', exact: true }).click();
+  await page.getByRole('button', { name: 'Set meetup here', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Meetup title', exact: true })).toBeEmpty();
   await page.getByRole('textbox', { name: 'Meetup title', exact: true }).fill('A park meetup');
   await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
-  await expect(page.getByText('Flamingo Park', { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByText('Near Flamingo Park', { exact: true })
+      .or(page.getByText('Pinned meeting spot', { exact: true })),
+  ).toBeVisible();
 });
 
 test('phone and tablet layouts keep navigation and sheets usable', async ({ page }) => {
@@ -266,4 +276,44 @@ test('drag reversal, stationary touch, release and repeated gestures retain map 
   await page.getByRole('button', { name: 'Recenter demo map' }).click();
   await alex.click();
   await expect(page.getByRole('button', { name: 'Say hello', exact: true })).toBeVisible();
+});
+
+test('map-native Now meetup, group chat, availability and public discovery controls', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Create meetup on map', exact: true }).click();
+  await expect(page.getByText('Bring people here', { exact: true })).toBeVisible();
+  await page.mouse.move(195, 350);
+  await page.mouse.down();
+  await page.mouse.move(200, 320, { steps: 12 });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Set meetup here', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Meetup title', exact: true }).fill('Coffee right now');
+  await page.getByRole('button', { name: 'Now', exact: true }).click();
+  await page.getByRole('button', { name: 'Public nearby', exact: true }).click();
+  await page.getByRole('button', { name: '4 people', exact: true }).click();
+  await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
+  await expect(page.getByText('Public nearby · Happening now', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open chat', exact: true }).click();
+  await page
+    .getByRole('textbox', { name: 'Meetup message', exact: true })
+    .fill('I am by the entrance.');
+  await page.getByRole('button', { name: 'Send meetup message', exact: true }).click();
+  await expect(page.getByText('I am by the entrance.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open meeting spot on map', exact: true }).click();
+  await page.getByRole('button', { name: 'Set my availability', exact: true }).click();
+  await page.getByRole('button', { name: 'Free now', exact: true }).last().click();
+  await page.getByRole('textbox', { name: 'Your idea (optional)', exact: true }).fill('Coffee?');
+  await page.getByRole('button', { name: 'Set availability', exact: true }).click();
+  await page.getByRole('button', { name: 'Location privacy', exact: true }).click();
+  await page.getByRole('button', { name: 'Public discovery', exact: true }).click();
+  await expect(
+    page.getByText(/Public discovery shows only an approximate neighborhood/),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'Messages', exact: true }).click();
+  await page.getByRole('button', { name: 'Meetup chat Coffee right now', exact: true }).click();
+  await expect(page.getByText('I am by the entrance.', { exact: true })).toBeVisible();
 });

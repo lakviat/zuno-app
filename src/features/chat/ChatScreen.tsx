@@ -1,3 +1,4 @@
+import { canReadMeetupChat } from '../meetups/chatDomain';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Avatar, EmptyState, Field, IconButton, Txt, ui } from '../../components/ui';
@@ -44,8 +45,27 @@ export function ChatScreen({ friendId, navigate }: { friendId?: string; navigate
         subtitle="Good things start with a conversation."
         onClose={() => navigate({ name: 'map' })}
       >
+        {state.meetups
+          .filter((m) => canReadMeetupChat(state, state.currentUserId, m.id))
+          .map((m) => (
+            <Pressable
+              key={m.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Meetup chat ${m.title}`}
+              onPress={() => navigate({ name: 'meetup-chat', meetupId: m.id })}
+              style={[ui.row, { gap: 12, paddingVertical: 12 }]}
+            >
+              <Txt style={{ fontSize: 28 }}>{m.emoji}</Txt>
+              <View style={{ flex: 1 }}>
+                <Txt weight="bold">{m.title}</Txt>
+                <Txt muted style={{ fontSize: 12 }}>
+                  {m.participantIds.length} going · {m.place.name}
+                </Txt>
+              </View>
+            </Pressable>
+          ))}
         {state.conversations
-          .filter((c) => c.participantIds.every((id) => !isBlocked(state, id)))
+          .filter((c) => !c.meetupId && c.participantIds.every((id) => !isBlocked(state, id)))
           .map((c) => {
             const friend = state.people.find(
               (p) => c.participantIds.includes(p.user.id) && p.user.id !== state.currentUserId,

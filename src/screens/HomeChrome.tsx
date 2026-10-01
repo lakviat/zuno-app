@@ -2,6 +2,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { Avatar, Icon, IconButton, Txt, ui, type IconName } from '../components/ui';
 import { Brand } from '../components/Brand';
 import { useApp } from '../state/AppContext';
+import { isAvailable } from '../features/presence/domain';
 import { tokens } from '../theme/tokens';
 import type { Navigate } from '../navigation/routes';
 
@@ -104,7 +105,7 @@ export function WorldPanel({
   navigate: Navigate;
   selectPerson: (id: string) => void;
 }) {
-  const { friends, me, colors } = useApp();
+  const { friends, me, colors, now } = useApp();
   return (
     <View style={{ position: 'absolute', left: 28, top, bottom: 97, width: 296 }}>
       <ScrollView
@@ -181,8 +182,8 @@ export function WorldPanel({
           <View style={[ui.row, { gap: 6, marginTop: 22 }]}>
             <View style={{ width: 6, height: 6, borderRadius: 5, backgroundColor: colors.green }} />
             <Txt muted style={{ fontSize: 10 }}>
-              {friends.filter((f) => f.presence.freeNow).length} friends are free for a little
-              adventure
+              {friends.filter((f) => isAvailable(f.presence, now)).length} friends are free for a
+              little adventure
             </Txt>
           </View>
         </View>
@@ -315,7 +316,7 @@ export function BottomNav({
   );
 }
 export function MobilePeoplePill({ bottom, navigate }: { bottom: number; navigate: Navigate }) {
-  const { friends, colors } = useApp();
+  const { friends, colors, now } = useApp();
   return (
     <Pressable
       accessibilityRole="button"
@@ -352,7 +353,7 @@ export function MobilePeoplePill({ bottom, navigate }: { bottom: number; navigat
         ))}
       </View>
       <Txt weight="bold" style={{ fontSize: 11 }}>
-        {friends.filter((f) => f.presence.freeNow).length} friends free now
+        {friends.filter((f) => isAvailable(f.presence, now)).length} friends free now
       </Txt>
       <Icon name="arrow-up-right" size={15} color={colors.accent} />
     </Pressable>

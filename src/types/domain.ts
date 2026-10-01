@@ -22,6 +22,9 @@ export interface Presence {
   emoji: string;
   updatedAt: string;
   freeNow: boolean;
+  availability?: 'free' | 'later' | 'busy';
+  availableUntil?: string;
+  intent?: string;
 }
 export type LocationPrecision = 'precise' | 'approximate' | 'hidden';
 export interface TemporarySharing {
@@ -53,11 +56,17 @@ export interface Person {
   profile: Profile;
   presence: Presence;
   location?: Location;
+  /** Inbound friend-visible data, never the device's private GPS sample. */
+  friendPrivacy?: LocationPrivacy;
+  discoverability?: 'public' | 'friends' | 'hidden';
+  publicDiscoveryLocation?: Location;
+  mapAudience?: 'friend' | 'public';
 }
 export interface Conversation {
   id: ID;
   participantIds: ID[];
   unreadCount: number;
+  meetupId?: ID;
 }
 export interface Message {
   id: ID;
@@ -66,6 +75,7 @@ export interface Message {
   text: string;
   createdAt: string;
   state: 'sent' | 'read';
+  kind?: 'text' | 'system';
 }
 export interface Place {
   id: ID;
@@ -114,6 +124,9 @@ export interface DiscoveryPreferences {
   optedIn: boolean;
   area?: string;
   interests: string[];
+  mode?: 'public' | 'friends' | 'hidden';
+  hiddenUserIds?: ID[];
+  units?: 'mph' | 'kmh';
 }
 export interface AppSnapshot {
   version: 2;
@@ -139,7 +152,7 @@ export type LegacySnapshot = Omit<AppSnapshot, 'version' | 'meetups'> & {
 };
 export type MeetupVisibility = 'friends' | 'invite-only' | 'public';
 export interface MeetupPlace extends Place {
-  kind: 'public-venue' | 'area';
+  kind: 'public-venue' | 'area' | 'map-pin';
   areaId: string;
 }
 export interface Meetup {
@@ -164,6 +177,8 @@ export interface MeetupDraft {
   description: string;
   emoji: string;
   placeId: ID;
+  place?: MeetupPlace;
+  startNow?: boolean;
   startsAt: string;
   endsAt: string;
   visibility: MeetupVisibility;

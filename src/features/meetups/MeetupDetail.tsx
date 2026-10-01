@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Share, View } from 'react-native';
 import { Avatar, Button, EmptyState, Icon, Txt, ui } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { useApp } from '../../state/AppContext';
 import type { Navigate } from '../../navigation/routes';
+import { useMotion } from '../location/store';
+import { distanceMeters } from '../../utils/geo';
 import { uid } from '../../utils/time';
 import {
   blockedBetween,
   canManageMeetup,
   getAuthorizedMeetup,
   meetupStatus,
+  meetupLifecycle,
   participationAction,
 } from './domain';
 import { audienceLabels } from './places';
@@ -17,6 +20,7 @@ import { localZone, meetupTime } from './localTime';
 
 export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigate: Navigate }) {
   const { state, now, colors, meetupViewerId, runMeetup, notify, dispatch } = useApp();
+  const sample = useMotion(state.currentUserId);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState('');
   const m = getAuthorizedMeetup(state, meetupViewerId, meetupId);
@@ -54,6 +58,14 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
                 {error}
               </Txt>
             )}
+            {m.participantIds.includes(meetupViewerId) && (
+              <Button
+                icon="message-circle"
+                onPress={() => navigate({ name: 'meetup-chat', meetupId })}
+              >
+                Open chat
+              </Button>
+            )}
             {canManage ? (
               <Button icon="edit-2" onPress={() => navigate({ name: 'edit-meetup', meetupId })}>
                 Edit meetup
@@ -87,7 +99,8 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
               {m.title}
             </Txt>
             <Txt style={{ color: colors.accent }}>
-              {audienceLabels[m.visibility]} · {meetupStatus(m, now)}
+              {audienceLabels[m.visibility]} ·{' '}
+              {meetupLifecycle(m, now) === 'active' ? 'Happening now' : meetupStatus(m, now)}
             </Txt>
             {!!m.description && (
               <Txt muted style={{ textAlign: 'center', lineHeight: 22 }}>
@@ -130,6 +143,38 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
               This is a meeting spot, never a participant’s live location.
             </Txt>
           </View>
+          <View style={[ui.row, { flexWrap: 'wrap', gap: 8 }]}>
+            <Button
+              kind="secondary"
+              icon="map-pin"
+              onPress={() => navigate({ name: 'map', coordinate: m.place.coordinate })}
+            >
+              Show on map
+            </Button>
+            <Button kind="quiet" onPress={() => navigate({ name: 'profile', userId: m.hostId })}>
+              View host
+            </Button>
+            <Button
+              kind="quiet"
+              icon="share"
+              onPress={() => {
+                void Share.share({
+                  message: `${m.emoji} ${m.title} · ${m.place.name} · ${meetupTime(m.startsAt)}. Meeting spot: https://maps.apple.com/?ll=${m.place.coordinate.latitude},${m.place.coordinate.longitude}`,
+                }).catch(() => notify('Sharing is unavailable.'));
+              }}
+            >
+              Share
+            </Button>
+          </View>
+          {sample && now - sample.timestamp < 90000 && (
+            <Txt muted>
+              {(
+                distanceMeters(sample.coordinate, m.place.coordinate) /
+                (state.discovery.units === 'kmh' ? 1000 : 1609.344)
+              ).toFixed(1)}{' '}
+              {state.discovery.units === 'kmh' ? 'km' : 'miles'} away
+            </Txt>
+          )}
           <View style={ui.between}>
             <Txt weight="bold">{m.participantIds.length} going</Txt>
             <Txt muted style={{ fontSize: 12 }}>
@@ -193,8 +238,8 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
             </Button>
           )}
           <Txt muted style={{ fontSize: 11, lineHeight: 17 }}>
-            Joining doesn’t add friends, open messaging, or share your location. Invitations and
-            attendance stay on this device.
+            Joining opens this meetup’s group chat. It never adds friends or shares your location.
+            Invitations and attendance stay on this device.
           </Txt>
         </>
       )}

@@ -1,8 +1,19 @@
+import { sendMeetupMessage } from '../features/meetups/chatDomain';
 import { executeMeetup, type MeetupCommand } from '../features/meetups/domain';
 import type { AppSnapshot, LocationPrivacy, Message, Profile } from '../types/domain';
 import { isBlocked, isFriend } from '../utils/privacy';
 
 export type Action =
+  | { type: 'discovery'; value: Partial<AppSnapshot['discovery']> }
+  | { type: 'availability'; value: 'free' | 'later' | 'busy'; intent: string; now: number }
+  | {
+      type: 'meetup-message';
+      actorId: string;
+      meetupId: string;
+      text: string;
+      id: string;
+      now: number;
+    }
   | { type: 'hydrate'; snapshot: AppSnapshot }
   | { type: 'privacy'; value: LocationPrivacy }
   | { type: 'zoom-hint-seen' }
@@ -28,6 +39,36 @@ export type Action =
 
 export function reducer(state: AppSnapshot, action: Action): AppSnapshot {
   switch (action.type) {
+    case 'discovery':
+      return { ...state, discovery: { ...state.discovery, ...action.value } };
+    case 'availability':
+      return {
+        ...state,
+        people: state.people.map((p) =>
+          p.user.id !== state.currentUserId
+            ? p
+            : {
+                ...p,
+                presence: {
+                  ...p.presence,
+                  availability: action.value,
+                  freeNow: action.value === 'free',
+                  intent: action.intent.trim().slice(0, 60),
+                  availableUntil: new Date(action.now + 7200000).toISOString(),
+                  updatedAt: new Date(action.now).toISOString(),
+                },
+              },
+        ),
+      };
+    case 'meetup-message':
+      return sendMeetupMessage(
+        state,
+        action.actorId,
+        action.meetupId,
+        action.text,
+        action.id,
+        action.now,
+      );
     case 'hydrate':
       return action.snapshot;
     case 'privacy':

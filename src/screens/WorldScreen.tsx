@@ -1,9 +1,17 @@
-import { useCallback, useRef, useState, useEffect } from 'react';
+import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ActivityIndicator, BackHandler, Platform, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Chip, Icon, IconButton, Txt, ui } from '../components/ui';
 import { useApp } from '../state/AppContext';
+import { AvailabilityScreen } from '../features/presence/AvailabilityScreen';
+import { discoverablePeople, isAvailable } from '../features/presence/domain';
+import { MeetupChat } from '../features/chat/MeetupChat';
+import { LocationPicker } from '../features/meetups/LocationPicker';
+import { mapPlace } from '../features/meetups/mapPlace';
+import { MIAMI } from '../features/map/types';
+import type { Coordinate } from '../types/domain';
+import type { MapViewport } from '../utils/geo';
 import { SocialMap } from '../features/map/SocialMap';
 import type { MapHandle } from '../features/map/types';
 import { EdgeZoom } from '../features/map/EdgeZoom';
@@ -36,9 +44,26 @@ export function WorldScreen() {
     meetupViewerId,
     setMeetupViewerId,
     meetupAreaId,
+    setMeetupViewport,
   } = useApp();
   const [route, setRoute] = useState<Route>({ name: 'map' });
   const [selected, setSelected] = useState<string>();
+  const [placing, setPlacing] = useState<{ friendId?: string }>();
+  const [moving, setMoving] = useState(false);
+  const [viewport, setViewport] = useState<MapViewport>({
+    ...MIAMI,
+    latitudeDelta: 0.06,
+    longitudeDelta: 0.05,
+  });
+  const onViewportChange = useCallback(
+    (next: MapViewport) => {
+      setViewport(next);
+      setMeetupViewport(next);
+      setMoving(false);
+    },
+    [setMeetupViewport],
+  );
+  const onMoving = useCallback(() => setMoving(true), []);
   const [filter, setFilter] = useState<'all' | 'free' | 'meetups'>('all');
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -61,6 +86,16 @@ export function WorldScreen() {
     (next: Route) => {
       map.current?.endZoom();
       if (next.name === 'create-meetup' && next.friendId) setMeetupViewerId(state.currentUserId);
+      if (next.name === 'create-meetup' && !next.place) {
+        setSelected(undefined);
+        setPlacing({ friendId: next.friendId });
+        setMoving(false);
+        setRoute({ name: 'map' });
+        return;
+      }
+      if (next.name === 'create-meetup' && next.place) setFilter('all');
+      if (next.name === 'map' && next.coordinate) map.current?.recenter(next.coordinate);
+      setPlacing(undefined);
       setRoute(next);
     },
     [setMeetupViewerId, state.currentUserId],
@@ -80,13 +115,45 @@ export function WorldScreen() {
     return () => sub.remove();
   }, [route.name, selected]);
   const personalView = meetupViewerId === state.currentUserId;
-  const person = personalView ? friends.find((f) => f.user.id === selected) : undefined;
-  const meetups = listVisibleMeetups(state, meetupViewerId, { now, areaId: meetupAreaId });
-  const selectPerson = (id: string) => {
-    map.current?.endZoom();
-    setSelected(id);
-    if (filter === 'meetups') setFilter('all');
-  };
+  const eligiblePeople = useMemo(() => discoverablePeople(state, now), [state, now]);
+  const person = personalView ? eligiblePeople.find((f) => f.user.id === selected) : undefined;
+  const meetups = useMemo(
+    () => (filter === 'free' ? [] : listVisibleMeetups(state, meetupViewerId, { now, viewport })),
+    [state, meetupViewerId, now, viewport, filter],
+  );
+  const mapPeople = useMemo(
+    () =>
+      filter === 'meetups' || !personalView
+        ? []
+        : eligiblePeople.filter((f) => filter !== 'free' || isAvailable(f.presence, now)),
+    [filter, personalView, eligiblePeople, now],
+  );
+  const mapMe = useMemo(
+    () => (personalView ? me : { ...me, location: undefined }),
+    [personalView, me],
+  );
+  const onMeetupPress = useCallback(
+    (meetupId: string) => navigate({ name: 'meetups', meetupId }),
+    [navigate],
+  );
+  const onMeetupClusterPress = useCallback(
+    (clusterIds: string[]) => navigate({ name: 'meetups', clusterIds }),
+    [navigate],
+  );
+  const onLongPress = useCallback((coordinate: Coordinate) => {
+    map.current?.recenter(coordinate);
+    setSelected(undefined);
+    setPlacing({});
+    setRoute({ name: 'map' });
+  }, []);
+  const selectPerson = useCallback(
+    (id: string) => {
+      map.current?.endZoom();
+      setSelected(id);
+      if (filter === 'meetups') setFilter('all');
+    },
+    [filter],
+  );
   if (!ready)
     return (
       <View
@@ -107,18 +174,17 @@ export function WorldScreen() {
       <StatusBar style={dark ? 'light' : 'dark'} />
       <SocialMap
         ref={map}
-        people={
-          filter === 'meetups' || meetupViewerId !== state.currentUserId
-            ? []
-            : friends.filter((f) => filter !== 'free' || f.presence.freeNow)
-        }
-        me={meetupViewerId === state.currentUserId ? me : { ...me, location: undefined }}
+        people={mapPeople}
+        me={mapMe}
         meetups={meetups}
         dark={dark}
         selectedId={selected}
         onPersonPress={selectPerson}
-        onMeetupPress={(meetupId) => navigate({ name: 'meetups', meetupId })}
-        onMeetupClusterPress={(clusterIds) => navigate({ name: 'meetups', clusterIds })}
+        onMeetupPress={onMeetupPress}
+        onMeetupClusterPress={onMeetupClusterPress}
+        onViewportChange={onViewportChange}
+        onMoving={onMoving}
+        onLongPress={onLongPress}
       />
       {Platform.OS === 'ios' && route.name === 'map' && (
         <ScreenEdgeZoom
@@ -134,7 +200,7 @@ export function WorldScreen() {
         />
       )}
       <Header wide={wide} top={insets.top} navigate={navigate} />
-      {wide && personalView && (
+      {wide && personalView && !placing && (
         <WorldPanel top={top} navigate={navigate} selectPerson={selectPerson} />
       )}
       <View
@@ -204,7 +270,7 @@ export function WorldScreen() {
           </Txt>
         </View>
       )}
-      {route.name === 'map' && (!person || wide) && (
+      {route.name === 'map' && !placing && (!person || wide) && (
         <View
           style={{
             position: 'absolute',
@@ -218,6 +284,19 @@ export function WorldScreen() {
           {Platform.OS !== 'ios' && (
             <EdgeZoom onZoom={zoomMap} onBegin={beginZoom} onUpdate={updateZoom} onEnd={endZoom} />
           )}
+          <IconButton
+            name="plus"
+            label="Create meetup on map"
+            active
+            onPress={() => navigate({ name: 'create-meetup' })}
+            style={tokens.shadow}
+          />
+          <IconButton
+            name="zap"
+            label="Set my availability"
+            onPress={() => navigate({ name: 'availability' })}
+            style={tokens.shadow}
+          />
           <IconButton
             name="navigation"
             label="Recenter demo map"
@@ -235,9 +314,26 @@ export function WorldScreen() {
           onClose={() => setSelected(undefined)}
         />
       ) : (
-        !wide && personalView && <MobilePeoplePill bottom={bottom + 88} navigate={navigate} />
+        !wide &&
+        personalView &&
+        !placing && <MobilePeoplePill bottom={bottom + 88} navigate={navigate} />
       )}
-      <BottomNav wide={wide} bottom={bottom} navigate={navigate} />
+      {!placing && <BottomNav wide={wide} bottom={bottom} navigate={navigate} />}
+      {placing && (
+        <LocationPicker
+          viewport={viewport}
+          moving={moving}
+          bottom={bottom + 16}
+          onCancel={() => setPlacing(undefined)}
+          onConfirm={() =>
+            navigate({
+              name: 'create-meetup',
+              friendId: placing.friendId,
+              place: mapPlace(viewport),
+            })
+          }
+        />
+      )}
       {wide && (
         <View style={[ui.row, { position: 'absolute', left: 32, bottom: 35, gap: 7 }]}>
           <Icon name="heart" size={12} color={colors.muted} />
@@ -279,6 +375,10 @@ export function WorldScreen() {
         </View>
       )}
       <SheetHost visible={route.name !== 'map'} onClose={() => navigate({ name: 'map' })}>
+        {route.name === 'availability' && <AvailabilityScreen navigate={navigate} />}
+        {route.name === 'meetup-chat' && (
+          <MeetupChat meetupId={route.meetupId} navigate={navigate} />
+        )}
         {route.name === 'friends' && <FriendsScreen navigate={navigate} />}
         {route.name === 'inbox' && <ChatScreen friendId={route.friendId} navigate={navigate} />}
         {route.name === 'meetups' && (
@@ -289,7 +389,12 @@ export function WorldScreen() {
           />
         )}
         {route.name === 'create-meetup' && (
-          <MeetupForm key="create" friendId={route.friendId} navigate={navigate} />
+          <MeetupForm
+            key="create"
+            friendId={route.friendId}
+            place={route.place}
+            navigate={navigate}
+          />
         )}
         {route.name === 'edit-meetup' && (
           <MeetupForm key={route.meetupId} meetupId={route.meetupId} navigate={navigate} />

@@ -17,15 +17,29 @@ export function MeetupsScreen({
   clusterIds?: string[];
   navigate: Navigate;
 }) {
-  const { state, now, colors, meetupViewerId, setMeetupViewerId, meetupAreaId, setMeetupAreaId } =
-    useApp();
+  const {
+    state,
+    now,
+    colors,
+    meetupViewerId,
+    setMeetupViewerId,
+    meetupAreaId,
+    setMeetupAreaId,
+    meetupViewport,
+  } = useApp();
   const [filter, setFilter] = useState<MeetupFilter>('all');
+  const [areaSelected, setAreaSelected] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const viewerName =
     state.people.find((p) => p.user.id === meetupViewerId)?.profile.displayName.split(' ')[0] ??
     'Maya';
   if (meetupId) return <MeetupDetail meetupId={meetupId} navigate={navigate} />;
-  const visible = listVisibleMeetups(state, meetupViewerId, { now, filter, areaId: meetupAreaId });
+  const visible = listVisibleMeetups(state, meetupViewerId, {
+    now,
+    filter,
+    areaId: meetupAreaId,
+    viewport: !areaSelected ? meetupViewport : undefined,
+  });
   const meetups = clusterIds ? visible.filter((m) => clusterIds.includes(m.id)) : visible;
   return (
     <Sheet
@@ -95,7 +109,7 @@ export function MeetupsScreen({
         <View style={[ui.row, { gap: 6 }]}>
           <Icon name="map-pin" size={14} />
           <Txt weight="bold" style={{ fontSize: 12 }}>
-            Meeting area
+            {areaSelected ? 'Meeting area' : 'In the area you’re browsing'}
           </Txt>
         </View>
         <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
@@ -104,7 +118,10 @@ export function MeetupsScreen({
               key={a.id}
               label={a.name}
               active={a.id === meetupAreaId}
-              onPress={() => setMeetupAreaId(a.id)}
+              onPress={() => {
+                setAreaSelected(true);
+                setMeetupAreaId(a.id);
+              }}
             />
           ))}
         </View>

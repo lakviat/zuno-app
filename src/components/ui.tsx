@@ -13,7 +13,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
-import { useApp } from '../state/AppContext';
+import { useTheme } from '../state/AppContext';
 import { tokens } from '../theme/tokens';
 import { avatars } from '../mocks/avatars';
 import type { Person } from '../types/domain';
@@ -28,7 +28,7 @@ export function Icon({
   size?: number;
   color?: string;
 }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   return <Feather name={name} size={size} color={color ?? colors.ink} />;
 }
 export function Txt({
@@ -38,7 +38,7 @@ export function Txt({
   weight = 'body',
   ...props
 }: React.ComponentProps<typeof Text> & { muted?: boolean; weight?: keyof typeof tokens.font }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   return (
     <Text
       {...props}
@@ -60,7 +60,7 @@ export function Avatar({
   size?: number;
   online?: boolean;
 }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   const source = avatars[person.profile.avatar];
   return (
     <View style={{ width: size, height: size }}>
@@ -124,7 +124,7 @@ export function Button({
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   const color = kind === 'primary' ? '#FFFFFF' : kind === 'danger' ? colors.accent : colors.ink;
   return (
     <Pressable
@@ -173,7 +173,7 @@ export function IconButton({
   style?: StyleProp<ViewStyle>;
   active?: boolean;
 }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -211,7 +211,7 @@ export function Chip({
   active?: boolean;
   onPress: () => void;
 }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -238,7 +238,7 @@ export function Chip({
   );
 }
 export function Field({ label, style, ...props }: TextInputProps & { label?: string }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   return (
     <View style={{ gap: 8 }}>
       {label && (
@@ -272,7 +272,7 @@ export function Field({ label, style, ...props }: TextInputProps & { label?: str
   );
 }
 export function EmptyState({ icon, title, body }: { icon: IconName; title: string; body: string }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   return (
     <View style={{ padding: 32, alignItems: 'center', gap: 12 }}>
       <Icon name={icon} size={32} color={colors.muted} />

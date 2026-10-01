@@ -3,7 +3,7 @@ import { meetupPlaces } from '../features/meetups/places';
 
 /** Keep every unrelated field intact, including privacy, messages and friendships. */
 export function migrateSnapshot(data: LegacySnapshot | AppSnapshot): AppSnapshot {
-  if (data.version === 2) return data;
+  if (data.version === 2) return upgradeSocialWorld(data);
   const { plans, version: _version, ...rest } = data;
   const meetups: Meetup[] = plans.map((plan) => ({
     id: plan.id,
@@ -41,5 +41,62 @@ export function migrateSnapshot(data: LegacySnapshot | AppSnapshot): AppSnapshot
     createdAt: plan.startsAt,
     updatedAt: plan.startsAt,
   }));
-  return { ...rest, version: 2, meetups };
+  return upgradeSocialWorld({ ...rest, version: 2, meetups });
+}
+
+/** Additive upgrade: preserve saved content; create only missing conversation records. */
+function upgradeSocialWorld(state: AppSnapshot): AppSnapshot {
+  const missingConversations = state.meetups.filter(
+    (m) => !state.conversations.some((c) => c.meetupId === m.id),
+  );
+  const missingExpiry = state.people.some((p) => !p.presence.availableUntil);
+  const missingFriendPolicy = state.people.some((p) => p.location && !p.friendPrivacy);
+  const missingPublicFixture = state.people.some(
+    (p) => p.user.id === 'mia' && !p.location && p.discoverability === undefined,
+  );
+  if (
+    !missingConversations.length &&
+    !missingExpiry &&
+    !missingPublicFixture &&
+    !missingFriendPolicy
+  )
+    return state;
+  return {
+    ...state,
+    people: state.people.map((p) => ({
+      ...p,
+      // Legacy Person.location contains fictional friend-visible fixtures, not raw GPS.
+      ...(p.location && !p.friendPrivacy
+        ? { friendPrivacy: { mode: p.location.precision, ghostMode: false } }
+        : {}),
+      ...(p.user.id === 'mia' && !p.location && p.discoverability === undefined
+        ? {
+            discoverability: 'public' as const,
+            publicDiscoveryLocation: {
+              userId: p.user.id,
+              coordinate: { latitude: 25.78, longitude: -80.12 },
+              accuracyMeters: 2500,
+              precision: 'approximate' as const,
+              place: 'Miami Beach neighborhood',
+              updatedAt: p.presence.updatedAt,
+            },
+          }
+        : {}),
+      presence: {
+        ...p.presence,
+        availableUntil:
+          p.presence.availableUntil ??
+          new Date(Date.parse(p.presence.updatedAt) + 2 * 3600000).toISOString(),
+      },
+    })),
+    conversations: [
+      ...state.conversations,
+      ...missingConversations.map((m) => ({
+        id: `meetup:${m.id}`,
+        meetupId: m.id,
+        participantIds: m.participantIds,
+        unreadCount: 0,
+      })),
+    ],
+  };
 }

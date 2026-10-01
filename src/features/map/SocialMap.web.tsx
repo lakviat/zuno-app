@@ -10,7 +10,7 @@ import { Pressable, View, useWindowDimensions } from 'react-native';
 import { Map as LibreMap, setWorkerUrl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Avatar, Txt } from '../../components/ui';
-import { useApp } from '../../state/AppContext';
+import { useTheme } from '../../state/AppContext';
 import { FriendMarker, MeetupMarker, MeetupClusterMarker } from './MapMarker';
 import { createZoomCamera } from './zoom';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
@@ -26,7 +26,9 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
   const [frame, setFrame] = useState(0);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const { colors } = useApp();
+  const { colors } = useTheme();
+  const callbacks = useRef(props);
+  callbacks.current = props;
   const dark = props.dark;
   const reduced = useReducedMotion();
   const zoom = useMemo(
@@ -47,6 +49,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
     if (!container.current) return;
     let instance: LibreMap;
     let animation = 0;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
     setWorkerUrl('/maplibre/maplibre-gl-worker.mjs');
     try {
       instance = new LibreMap({
@@ -71,6 +74,25 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
       animation = requestAnimationFrame(() => setFrame((n) => n + 1));
     };
     instance.on('move', repaint);
+    const publishViewport = () => {
+      clearTimeout(settleTimer);
+      // jumpTo emits moveend for every edge-zoom frame. Discovery must wait for rest.
+      settleTimer = setTimeout(() => {
+        const c = instance.getCenter(),
+          b = instance.getBounds();
+        callbacks.current.onViewportChange?.({
+          latitude: c.lat,
+          longitude: c.lng,
+          latitudeDelta: b.getNorth() - b.getSouth(),
+          longitudeDelta: b.getEast() - b.getWest(),
+        });
+      }, 180);
+    };
+    instance.on('movestart', () => callbacks.current.onMoving?.());
+    instance.on('moveend', publishViewport);
+    instance.on('contextmenu', (event) =>
+      callbacks.current.onLongPress?.({ latitude: event.lngLat.lat, longitude: event.lngLat.lng }),
+    );
     instance.on('load', () => {
       if (!dark)
         for (const layer of instance.getStyle().layers) {
@@ -79,6 +101,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
           if (layer.type === 'background')
             instance.setPaintProperty(layer.id, 'background-color', '#F3F1E9');
         }
+      publishViewport();
       setLoaded(true);
       setFailed(false);
       repaint();
@@ -93,6 +116,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
     resize.observe(container.current);
     return () => {
       cancelAnimationFrame(animation);
+      clearTimeout(settleTimer);
       resize.disconnect();
       instance.remove();
       map.current = null;

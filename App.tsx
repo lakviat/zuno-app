@@ -8,6 +8,7 @@ import { Outfit_600SemiBold } from '@expo-google-fonts/outfit/600SemiBold';
 import { Outfit_700Bold } from '@expo-google-fonts/outfit/700Bold';
 import { AppProvider } from './src/state/AppContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { LiveLocationProvider } from './src/features/location/LiveLocation';
 import { WorldScreen } from './src/screens/WorldScreen';
 export default function App() {
   const [loaded, error] = useFonts({
@@ -34,7 +35,9 @@ export default function App() {
     <ErrorBoundary>
       <SafeAreaProvider>
         <AppProvider>
-          <WorldScreen />
+          <LiveLocationProvider>
+            <WorldScreen />
+          </LiveLocationProvider>
         </AppProvider>
       </SafeAreaProvider>
     </ErrorBoundary>

@@ -158,6 +158,9 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
           <Button kind="secondary" icon="shield" onPress={() => navigate({ name: 'privacy' })}>
             Location & privacy
           </Button>
+          <Button kind="secondary" icon="zap" onPress={() => navigate({ name: 'availability' })}>
+            Availability & intent
+          </Button>
           <Txt weight="bold">Set the mood</Txt>
           <View style={[ui.row, { gap: 8 }]}>
             {(['light', 'dark', 'system'] as const).map((t) => (

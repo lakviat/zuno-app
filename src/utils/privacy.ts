@@ -40,6 +40,6 @@ export function locationForViewer(
     },
     accuracyMeters: 2500,
     precision: 'approximate',
-    place: 'Miami Beach area',
+    place: 'Approximate neighborhood',
   };
 }

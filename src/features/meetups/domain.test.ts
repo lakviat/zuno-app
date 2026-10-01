@@ -55,8 +55,8 @@ describe('meetup authorization and lifecycle', () => {
           state: 'sent',
           createdAt: draft.startsAt,
         },
-      }).messages,
-    ).toBe(s.messages);
+      }).messages.filter((m) => m.kind !== 'system'),
+    ).toEqual(s.messages.filter((m) => m.kind !== 'system'));
   });
   it('enforces audience on list, direct lookup and join, including pending requests', () => {
     const friends = create({ visibility: 'friends' });

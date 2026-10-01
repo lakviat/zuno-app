@@ -1,4 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import type { MapViewport } from '../utils/geo';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+} from 'react';
 import { useColorScheme } from 'react-native';
 import { createSeed } from '../mocks/seed';
 import { MockSocialRepository } from '../repositories/MockSocialRepository';
@@ -20,18 +29,20 @@ function useAppState(repository: SocialRepository) {
   // This preview actor only affects meetups. It never impersonates a personal location session.
   const [meetupViewerId, setMeetupViewerId] = useState('me');
   const [meetupAreaId, setMeetupAreaId] = useState('sunset-harbour');
+  const [meetupViewport, setMeetupViewport] = useState<MapViewport>();
+  const [now, setNow] = useState(Date.now);
   const runMeetup = useCallback(
     (command: MeetupCommand) => {
       const result = executeMeetup(latest.current, meetupViewerId, command);
       if (result.ok) {
         latest.current = result.snapshot;
         setState(result.snapshot);
+        setNow(Date.now());
       }
       return result;
     },
     [meetupViewerId],
   );
-  const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(id);
@@ -66,8 +77,9 @@ function useAppState(repository: SocialRepository) {
     return () => clearTimeout(timeout);
   }, [toast]);
   const dark = state.theme === 'dark' || (state.theme === 'system' && systemTheme === 'dark');
-  const friends = state.people.filter(
-    (p) => isFriend(state, p.user.id) && !isBlocked(state, p.user.id),
+  const friends = useMemo(
+    () => state.people.filter((p) => isFriend(state, p.user.id) && !isBlocked(state, p.user.id)),
+    [state],
   );
   const me = state.people.find((p) => p.user.id === state.currentUserId)!;
   const reset = useCallback(async () => {
@@ -80,6 +92,8 @@ function useAppState(repository: SocialRepository) {
     meetupViewerId,
     setMeetupViewerId,
     meetupAreaId,
+    meetupViewport,
+    setMeetupViewport,
     setMeetupAreaId,
     runMeetup,
     now,
@@ -94,13 +108,21 @@ function useAppState(repository: SocialRepository) {
     reset,
   };
 }
+const ThemeContext = createContext(palette.light);
+export function useTheme() {
+  return { colors: useContext(ThemeContext) };
+}
 const AppContext = createContext<ReturnType<typeof useAppState> | null>(null);
 export function AppProvider({
   children,
   repository = defaultRepository,
 }: React.PropsWithChildren<{ repository?: SocialRepository }>) {
   const value = useAppState(repository);
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <ThemeContext.Provider value={value.colors}>{children}</ThemeContext.Provider>
+    </AppContext.Provider>
+  );
 }
 export function useApp() {
   const value = useContext(AppContext);

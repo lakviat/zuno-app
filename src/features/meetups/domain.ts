@@ -1,5 +1,7 @@
 import type { AppSnapshot, Meetup, MeetupDraft } from '../../types/domain';
-import { activities, demoAreas, meetupPlaces } from './places';
+import { meetupPlaces } from './places';
+import { inViewport, validCoordinate, type MapViewport } from '../../utils/geo';
+import { withMeetupConversation } from './chatDomain';
 
 export type MeetupFilter = 'all' | 'friends' | 'public' | 'today' | 'joined';
 export const areFriends = (state: AppSnapshot, a: string, b: string) =>
@@ -13,6 +15,14 @@ export const blockedBetween = (state: AppSnapshot, a: string, b: string) =>
   state.blocks.some(
     (v) => (v.blockerId === a && v.blockedId === b) || (v.blockerId === b && v.blockedId === a),
   );
+export const meetupLifecycle = (m: Meetup, now: number) =>
+  m.status === 'cancelled'
+    ? 'cancelled'
+    : Date.parse(m.endsAt) <= now
+      ? 'ended'
+      : Date.parse(m.startsAt) <= now
+        ? 'active'
+        : 'scheduled';
 export const meetupStatus = (meetup: Meetup, now: number) =>
   meetup.status === 'cancelled'
     ? 'Cancelled'
@@ -47,7 +57,7 @@ export function getAuthorizedMeetup(
 export function listVisibleMeetups(
   state: AppSnapshot,
   viewerId: string,
-  options: { areaId: string; filter?: MeetupFilter; now: number },
+  options: { areaId?: string; viewport?: MapViewport; filter?: MeetupFilter; now: number },
 ): Meetup[] {
   const { filter = 'all', now, areaId } = options;
   return state.meetups
@@ -55,7 +65,9 @@ export function listVisibleMeetups(
       if (!authorized(state, m, viewerId)) return false;
       if (filter === 'joined') return m.participantIds.includes(viewerId);
       if (m.status === 'cancelled' || Date.parse(m.endsAt) <= now) return false;
-      if (m.visibility === 'public' && m.place.areaId !== areaId) return false;
+      if (options.viewport && !inViewport(m.place.coordinate, options.viewport)) return false;
+      if (!options.viewport && areaId && m.visibility === 'public' && m.place.areaId !== areaId)
+        return false;
       if (filter === 'public') return m.visibility === 'public';
       if (filter === 'friends')
         return m.hostId === viewerId || areFriends(state, viewerId, m.hostId);
@@ -81,20 +93,34 @@ function validateDraft(
   draft: MeetupDraft,
   now: number,
   count: number,
+  originalStart?: string,
 ): string | undefined {
   if (!draft.title.trim() || draft.title.trim().length > 60)
     return 'Add a title between 1 and 60 characters.';
   if (draft.description.length > 240) return 'Keep the description under 240 characters.';
-  if (!activities.some((a) => a.emoji === draft.emoji)) return 'Choose an activity.';
+  if (!draft.emoji.trim() || draft.emoji.length > 16) return 'Choose an activity.';
   if (!['friends', 'invite-only', 'public'].includes(draft.visibility))
     return 'Choose who can see this meetup.';
-  if (!meetupPlaces.some((p) => p.id === draft.placeId && demoAreas.some((a) => a.id === p.areaId)))
-    return 'Choose a public venue or approximate area.';
+  const place = draft.place ?? meetupPlaces.find((p) => p.id === draft.placeId);
+  if (
+    !place ||
+    !validCoordinate(place.coordinate) ||
+    !place.name.trim() ||
+    !place.areaId ||
+    (draft.place && place.kind !== 'map-pin')
+  )
+    return 'Choose a valid meeting spot on the map.';
   const start = Date.parse(draft.startsAt),
     end = Date.parse(draft.endsAt);
   if (!Number.isFinite(start) || !Number.isFinite(end))
     return 'Enter a valid start and end date/time.';
-  if (start <= now) return 'Choose a start time in the future.';
+  if (
+    !draft.startNow &&
+    start <= now &&
+    Math.floor(start / 60000) !== Math.floor(Date.parse(originalStart ?? '') / 60000)
+  )
+    return 'Choose a start time in the future.';
+  if (end <= now) return 'Choose an end time in the future.';
   if (end <= start) return 'The end time must be after the start.';
   if (
     draft.capacity !== undefined &&
@@ -126,7 +152,7 @@ export function participationAction(
   return { operation: 'join', label: 'Join meetup' };
 }
 export const canManageMeetup = (m: Meetup, viewerId: string, now: number) =>
-  m.hostId === viewerId && m.status !== 'cancelled' && Date.parse(m.startsAt) > now;
+  m.hostId === viewerId && m.status !== 'cancelled' && Date.parse(m.endsAt) > now;
 
 /** Pure local transaction. A future service must enforce these rules server-side. */
 export function executeMeetup(
@@ -150,8 +176,8 @@ export function executeMeetup(
       title: draft.title.trim(),
       description: draft.description.trim(),
       emoji: draft.emoji,
-      place: meetupPlaces.find((p) => p.id === draft.placeId)!,
-      startsAt: new Date(draft.startsAt).toISOString(),
+      place: draft.place ?? meetupPlaces.find((p) => p.id === draft.placeId)!,
+      startsAt: draft.startNow ? stamp : new Date(draft.startsAt).toISOString(),
       endsAt: new Date(draft.endsAt).toISOString(),
       visibility: draft.visibility,
       invitedUserIds: [...new Set(draft.invitedUserIds)],
@@ -161,7 +187,17 @@ export function executeMeetup(
       createdAt: stamp,
       updatedAt: stamp,
     };
-    return { ok: true, meetup, snapshot: { ...state, meetups: [...state.meetups, meetup] } };
+    return {
+      ok: true,
+      meetup,
+      snapshot: withMeetupConversation(
+        { ...state, meetups: [...state.meetups, meetup] },
+        meetup,
+        actorId,
+        'created',
+        stamp,
+      ),
+    };
   }
   const m = getAuthorizedMeetup(state, actorId, command.id);
   if (!m) return fail('This meetup is unavailable to this viewer.');
@@ -171,7 +207,14 @@ export function executeMeetup(
       return fail('Only the host can edit or cancel an upcoming meetup.');
     if (command.operation === 'cancel') next = { ...m, status: 'cancelled', updatedAt: stamp };
     else {
-      const error = validateDraft(state, actorId, command.draft, now, m.participantIds.length);
+      const error = validateDraft(
+        state,
+        actorId,
+        command.draft,
+        now,
+        m.participantIds.length,
+        m.startsAt,
+      );
       if (error) return fail(error);
       const { draft } = command;
       // Audience changes must not silently eject people who have already joined.
@@ -189,8 +232,8 @@ export function executeMeetup(
         title: draft.title.trim(),
         description: draft.description.trim(),
         emoji: draft.emoji,
-        place: meetupPlaces.find((p) => p.id === draft.placeId)!,
-        startsAt: new Date(draft.startsAt).toISOString(),
+        place: draft.place ?? meetupPlaces.find((p) => p.id === draft.placeId)!,
+        startsAt: draft.startNow ? stamp : new Date(draft.startsAt).toISOString(),
         endsAt: new Date(draft.endsAt).toISOString(),
         visibility: draft.visibility,
         invitedUserIds: [...new Set(draft.invitedUserIds)],
@@ -217,9 +260,21 @@ export function executeMeetup(
   return {
     ok: true,
     meetup: next,
-    snapshot: {
-      ...state,
-      meetups: state.meetups.map((item) => (item.id === next.id ? next : item)),
-    },
+    snapshot: withMeetupConversation(
+      {
+        ...state,
+        meetups: state.meetups.map((item) => (item.id === next.id ? next : item)),
+      },
+      next,
+      actorId,
+      command.operation === 'join'
+        ? 'joined'
+        : command.operation === 'leave'
+          ? 'left'
+          : command.operation === 'cancel'
+            ? 'cancelled'
+            : 'updated',
+      stamp,
+    ),
   };
 }

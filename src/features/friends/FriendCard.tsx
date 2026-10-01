@@ -6,6 +6,8 @@ import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { tokens } from '../../theme/tokens';
 import type { Navigate } from '../../navigation/routes';
 import type { Person } from '../../types/domain';
+import { useMotion } from '../location/store';
+import { motionLabel } from '../location/motion';
 export function FriendCard({
   person,
   wide,
@@ -19,7 +21,11 @@ export function FriendCard({
   onClose: () => void;
   navigate: Navigate;
 }) {
-  const { colors } = useApp();
+  const { colors, state, now, dispatch } = useApp();
+  const sample = useMotion(
+    person.user.id,
+    person.mapAudience !== 'public' && person.location?.precision === 'precise',
+  );
   const reduced = useReducedMotion();
   const [animation] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -76,21 +82,39 @@ export function FriendCard({
           {person.location?.place ?? 'Location is private'}
         </Txt>
         <Txt muted style={{ fontSize: 11 }}>
-          · sample presence
+          {person.mapAudience === 'public' ? '· Public · approximate' : '· Friend'}
         </Txt>
       </View>
+      {sample && (
+        <Txt style={{ marginTop: 10, fontSize: 12 }}>
+          {motionLabel(sample, state.discovery.units ?? 'mph', now)} ·{' '}
+          {now - sample.timestamp < 90000 ? 'Updated now' : 'Last known'}
+        </Txt>
+      )}
+      {!!person.presence.intent && <Txt style={{ marginTop: 8 }}>{person.presence.intent}</Txt>}
       <View style={[ui.row, { gap: 8, marginTop: 18 }]}>
         <Button
           style={{ flex: 1 }}
           icon="message-circle"
-          onPress={() => navigate({ name: 'inbox', friendId: person.user.id })}
+          onPress={() =>
+            navigate(
+              person.mapAudience === 'public'
+                ? { name: 'profile', userId: person.user.id }
+                : { name: 'inbox', friendId: person.user.id },
+            )
+          }
         >
-          Say hello
+          {person.mapAudience === 'public' ? 'View profile' : 'Say hello'}
         </Button>
         <Button
           kind="secondary"
           icon="plus"
-          onPress={() => navigate({ name: 'create-meetup', friendId: person.user.id })}
+          onPress={() =>
+            navigate({
+              name: 'create-meetup',
+              friendId: person.mapAudience === 'public' ? undefined : person.user.id,
+            })
+          }
         >
           Meetup
         </Button>
@@ -102,6 +126,20 @@ export function FriendCard({
       >
         A little more about them ↗
       </Button>
+      {person.mapAudience === 'public' && (
+        <Button
+          kind="quiet"
+          onPress={() => {
+            dispatch({
+              type: 'discovery',
+              value: { hiddenUserIds: [...(state.discovery.hiddenUserIds ?? []), person.user.id] },
+            });
+            onClose();
+          }}
+        >
+          Hide from my map
+        </Button>
+      )}
     </Animated.View>
   );
 }

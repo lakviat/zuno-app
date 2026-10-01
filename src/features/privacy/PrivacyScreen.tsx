@@ -3,14 +3,17 @@ import { Pressable, Switch, View } from 'react-native';
 import { Button, Chip, Icon, Txt, ui, type IconName } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { useApp } from '../../state/AppContext';
-import { deviceLocation } from '../../services/location';
+import { useLiveLocation } from '../location/LiveLocation';
+import { useMotion } from '../location/store';
+import { motionLabel } from '../location/motion';
 import type { LocationPrecision } from '../../types/domain';
 import type { Navigate } from '../../navigation/routes';
 
 export function PrivacyScreen({ navigate }: { navigate: Navigate }) {
   const { now, state, friends, dispatch, colors, notify } = useApp();
   const [selected, setSelected] = useState<string[]>([]);
-  const [locating, setLocating] = useState(false);
+  const live = useLiveLocation();
+  const sample = useMotion(state.currentUserId);
   const privacy = state.privacy;
   const modes: { mode: LocationPrecision; title: string; body: string; icon: IconName }[] = [
     {
@@ -72,6 +75,29 @@ export function PrivacyScreen({ navigate }: { navigate: Navigate }) {
           trackColor={{ true: colors.accent, false: colors.line }}
         />
       </View>
+      <Txt weight="bold">Appear on the map</Txt>
+      <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
+        {(['public', 'friends', 'hidden'] as const).map((mode) => (
+          <Chip
+            key={mode}
+            label={
+              mode === 'public'
+                ? 'Public discovery'
+                : mode === 'friends'
+                  ? 'Friends only'
+                  : 'Hidden'
+            }
+            active={(state.discovery.mode ?? 'friends') === mode}
+            onPress={() =>
+              dispatch({ type: 'discovery', value: { mode, optedIn: mode === 'public' } })
+            }
+          />
+        ))}
+      </View>
+      <Txt muted style={{ fontSize: 12, lineHeight: 19 }}>
+        Public discovery shows only an approximate neighborhood to non-friends. Exact friend sharing
+        is a separate choice below. Ghost mode overrides both.
+      </Txt>
       <Txt weight="bold">Who gets to see where you are?</Txt>
       {modes.map((m) => (
         <Pressable
@@ -160,25 +186,45 @@ export function PrivacyScreen({ navigate }: { navigate: Navigate }) {
           or broadcast.
         </Txt>
         <Button
-          disabled={locating}
+          disabled={live.busy}
           kind="secondary"
           icon="navigation"
-          onPress={async () => {
-            setLocating(true);
-            try {
-              await deviceLocation.requestCurrentPosition();
-              notify(
-                'Permission granted. Your real location stays on your device; the map remains in demo Miami.',
-              );
-            } catch (e) {
-              notify(e instanceof Error ? e.message : 'Could not get your location.');
-            } finally {
-              setLocating(false);
-            }
-          }}
+          onPress={() => (live.enabled ? live.stop() : void live.start())}
         >
-          {locating ? 'Checking permission…' : 'Check location permission'}
+          {live.busy
+            ? 'Checking permission…'
+            : live.enabled
+              ? 'Stop device location'
+              : 'Use location while here'}
         </Button>
+        {live.enabled && (
+          <Txt muted>
+            {sample
+              ? motionLabel(sample, state.discovery.units ?? 'mph')
+              : 'Waiting for an accurate GPS sample…'}{' '}
+            · On this device only
+          </Txt>
+        )}
+        {!!live.error && <Txt accessibilityRole="alert">{live.error}</Txt>}
+        <Txt muted style={{ fontSize: 12 }}>
+          Zuno uses location while open to show your movement and nearby distances. Tracking pauses
+          in the background. No background permission is requested.
+        </Txt>
+        <View style={[ui.row, { gap: 8 }]}>
+          {(['mph', 'kmh'] as const).map((units) => (
+            <Chip
+              key={units}
+              label={units === 'mph' ? 'Miles / mph' : 'Kilometers / km/h'}
+              active={(state.discovery.units ?? 'mph') === units}
+              onPress={() => dispatch({ type: 'discovery', value: { units } })}
+            />
+          ))}
+        </View>
+        {__DEV__ && (
+          <Button kind="quiet" onPress={live.toggleMock}>
+            {live.mock ? 'Stop simulated movement' : 'Preview simulated movement (development)'}
+          </Button>
+        )}
       </View>
       {blocked.length > 0 && (
         <>

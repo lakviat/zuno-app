@@ -1,22 +1,24 @@
 import { useRef, useState } from 'react';
-import { Keyboard, Pressable, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, View } from 'react-native';
 import { Button, Chip, EmptyState, Field, Icon, Txt, ui } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { useApp } from '../../state/AppContext';
 import type { Navigate, Route } from '../../navigation/routes';
-import type { MeetupDraft, MeetupVisibility } from '../../types/domain';
+import type { MeetupDraft, MeetupVisibility, MeetupPlace } from '../../types/domain';
 import { uid } from '../../utils/time';
 import { areFriends, blockedBetween, canManageMeetup, getAuthorizedMeetup } from './domain';
 import { activities, audienceLabels, meetupPlaces } from './places';
-import { endAfterStartChange, localDateTime, localZone, toInstant } from './localTime';
+import { endAfterStartChange, localDateTime, localZone, toInstant, meetupTime } from './localTime';
 import { DateTimeField } from './DateTimeField';
 
 export function MeetupForm({
   friendId,
+  place,
   meetupId,
   navigate,
 }: {
   friendId?: string;
+  place?: MeetupPlace;
   meetupId?: string;
   navigate: Navigate;
 }) {
@@ -26,8 +28,12 @@ export function MeetupForm({
   const [title, setTitle] = useState(existing?.title ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
   const [emoji, setEmoji] = useState(existing?.emoji ?? '☕');
+  const pinnedPlace = place ?? (existing?.place.kind === 'map-pin' ? existing.place : undefined);
+  const [startNow, setStartNow] = useState(false);
+  const [customTime, setCustomTime] = useState(!!meetupId);
   const [placeId, setPlaceId] = useState(
-    existing?.place.id ??
+    pinnedPlace?.id ??
+      existing?.place.id ??
       meetupPlaces.find((p) => p.areaId === meetupAreaId)?.id ??
       meetupPlaces[0].id,
   );
@@ -45,6 +51,7 @@ export function MeetupForm({
     description,
     emoji,
     placeId,
+    startNow,
     start,
     end,
     visibility,
@@ -59,6 +66,7 @@ export function MeetupForm({
     else navigate(route);
   };
   const changeStart = (next: string) => {
+    setStartNow(false);
     setEnd(endAfterStartChange(start, end, next));
     setStart(next);
   };
@@ -75,6 +83,8 @@ export function MeetupForm({
       description,
       emoji,
       placeId,
+      place: pinnedPlace?.id === placeId ? pinnedPlace : undefined,
+      startNow,
       startsAt: toInstant(start),
       endsAt: toInstant(end),
       visibility,
@@ -91,7 +101,7 @@ export function MeetupForm({
       return;
     }
     notify(meetupId ? 'Meetup updated.' : 'A little idea, a good get-together. Saved locally.');
-    setMeetupAreaId(result.meetup.place.areaId);
+    if (result.meetup.place.kind !== 'map-pin') setMeetupAreaId(result.meetup.place.areaId);
     navigate({ name: 'meetups', meetupId: result.meetup.id });
   };
   return (
@@ -139,17 +149,24 @@ export function MeetupForm({
         />
       ) : (
         <>
-          <View style={[ui.row, { gap: 8 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8 }}
+          >
             {activities.map((a) => (
               <Pressable
                 key={a.emoji}
                 accessibilityRole="button"
                 accessibilityLabel={`Choose ${a.label}`}
                 accessibilityState={{ selected: a.emoji === emoji }}
-                onPress={() => setEmoji(a.emoji)}
+                onPress={() => {
+                  setEmoji(a.emoji);
+                  if (!title.trim() && a.label !== 'Other') setTitle(`${a.label}, anyone?`);
+                }}
                 style={{
-                  flex: 1,
-                  height: 50,
+                  width: 68,
+                  height: 70,
                   borderRadius: 16,
                   backgroundColor: emoji === a.emoji ? colors.accentSoft : colors.raised,
                   alignItems: 'center',
@@ -157,9 +174,12 @@ export function MeetupForm({
                 }}
               >
                 <Txt style={{ fontSize: 25 }}>{a.emoji}</Txt>
+                <Txt muted style={{ fontSize: 10, marginTop: 4 }}>
+                  {a.label}
+                </Txt>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
           <Field
             label="Meetup title"
             placeholder="Coffee & a catch-up"
@@ -168,34 +188,75 @@ export function MeetupForm({
             maxLength={60}
             autoCapitalize="sentences"
           />
-          <Field
-            label="A little more (optional)"
-            placeholder="I’ll grab us a table…"
-            value={description}
-            onChangeText={setDescription}
-            maxLength={240}
-            multiline
-          />
-          <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
+          <View style={[ui.row, { gap: 6, flexWrap: 'wrap' }]}>
             <Chip
-              label="In 30 min"
-              icon="clock"
-              onPress={() =>
-                changeStart(localDateTime(Math.ceil((Date.now() + 1800000) / 300000) * 300000))
-              }
+              label="Now"
+              active={startNow}
+              onPress={() => {
+                setCustomTime(false);
+                setStartNow(true);
+                setStart(localDateTime(Date.now()));
+                setEnd(localDateTime(Date.now() + 7200000));
+              }}
             />
-            <Chip
-              label="In 1 hour"
-              onPress={() =>
-                changeStart(localDateTime(Math.ceil((Date.now() + 3600000) / 300000) * 300000))
-              }
-            />
+            {(['Later today', 'Tonight', 'Tomorrow'] as const).map((label) => (
+              <Chip
+                key={label}
+                label={label}
+                onPress={() => {
+                  setCustomTime(false);
+                  const date = new Date();
+                  if (label === 'Tomorrow') {
+                    date.setDate(date.getDate() + 1);
+                    date.setHours(12, 0, 0, 0);
+                  } else if (label === 'Tonight') {
+                    date.setHours(19, 0, 0, 0);
+                    if (date.getTime() <= Date.now()) date.setTime(Date.now() + 3600000);
+                  } else date.setTime(Date.now() + 3 * 3600000);
+                  changeStart(localDateTime(date.getTime()));
+                }}
+              />
+            ))}
           </View>
-          <DateTimeField label="Starts" value={start} onChange={changeStart} />
-          <DateTimeField label="Ends" value={end} onChange={setEnd} />
-          <Txt muted style={{ fontSize: 11 }}>
-            {localZone().replaceAll('_', ' ')} · Changing the start keeps your duration.
-          </Txt>
+          {startNow && (
+            <Txt style={{ color: colors.green }}>Happening now · two hours by default</Txt>
+          )}
+          <Chip
+            label="Custom date/time"
+            icon="calendar"
+            active={customTime}
+            onPress={() => setCustomTime((v) => !v)}
+          />
+          {!customTime && !startNow && (
+            <Txt muted style={{ fontSize: 12 }}>
+              {meetupTime(toInstant(start))} · until {meetupTime(toInstant(end))}
+            </Txt>
+          )}
+          {customTime && (
+            <>
+              {' '}
+              <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
+                <Chip
+                  label="In 30 min"
+                  icon="clock"
+                  onPress={() =>
+                    changeStart(localDateTime(Math.ceil((Date.now() + 1800000) / 300000) * 300000))
+                  }
+                />
+                <Chip
+                  label="In 1 hour"
+                  onPress={() =>
+                    changeStart(localDateTime(Math.ceil((Date.now() + 3600000) / 300000) * 300000))
+                  }
+                />
+              </View>
+              <DateTimeField label="Starts" value={start} onChange={changeStart} />
+              <DateTimeField label="Ends" value={end} onChange={setEnd} />
+              <Txt muted style={{ fontSize: 11 }}>
+                {localZone().replaceAll('_', ' ')} · Changing the start keeps your duration.
+              </Txt>
+            </>
+          )}
           <Txt weight="bold">Who can see and join?</Txt>
           <View style={[ui.row, { flexWrap: 'wrap', gap: 7 }]}>
             {(['friends', 'invite-only', 'public'] as const).map((v) => (
@@ -214,39 +275,64 @@ export function MeetupForm({
                 ? 'Your accepted friends can discover and join.'
                 : 'Only you and the friends you invite can see or join.'}
           </Txt>
-          <Txt weight="bold">Pick a meeting spot</Txt>
-          {meetupPlaces.map((p) => (
-            <Pressable
-              key={p.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Meet at ${p.name}`}
-              accessibilityState={{ selected: placeId === p.id }}
-              onPress={() => setPlaceId(p.id)}
-              style={[
-                ui.row,
-                {
-                  padding: 15,
-                  gap: 12,
-                  borderRadius: 15,
-                  backgroundColor: colors.raised,
-                  borderWidth: 1,
-                  borderColor: p.id === placeId ? colors.accent : colors.line,
-                },
-              ]}
+          <Txt weight="bold">Meeting spot</Txt>
+          {pinnedPlace && (
+            <View
+              style={{ padding: 16, borderRadius: 16, backgroundColor: colors.accentSoft, gap: 8 }}
             >
-              <View style={{ flex: 1 }}>
-                <Txt weight="medium">{p.name}</Txt>
-                <Txt muted style={{ fontSize: 11, marginTop: 4 }}>
-                  {p.area} · {p.kind === 'area' ? 'Approximate area' : 'Public venue'}
-                </Txt>
-              </View>
-              <Icon
-                name={p.id === placeId ? 'check-circle' : 'circle'}
-                color={p.id === placeId ? colors.accent : colors.muted}
-                size={19}
+              <Txt weight="bold">{pinnedPlace.name}</Txt>
+              <Txt muted>{pinnedPlace.area}</Txt>
+              <Button
+                kind="quiet"
+                onPress={() => requestLeave({ name: 'create-meetup', friendId })}
+              >
+                Choose another map spot
+              </Button>
+            </View>
+          )}
+          {!pinnedPlace &&
+            meetupPlaces.map((p) => (
+              <Pressable
+                key={p.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Meet at ${p.name}`}
+                accessibilityState={{ selected: placeId === p.id }}
+                onPress={() => setPlaceId(p.id)}
+                style={[
+                  ui.row,
+                  {
+                    padding: 15,
+                    gap: 12,
+                    borderRadius: 15,
+                    backgroundColor: colors.raised,
+                    borderWidth: 1,
+                    borderColor: p.id === placeId ? colors.accent : colors.line,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Txt weight="medium">{p.name}</Txt>
+                  <Txt muted style={{ fontSize: 11, marginTop: 4 }}>
+                    {p.area} · {p.kind === 'area' ? 'Approximate area' : 'Public venue'}
+                  </Txt>
+                </View>
+                <Icon
+                  name={p.id === placeId ? 'check-circle' : 'circle'}
+                  color={p.id === placeId ? colors.accent : colors.muted}
+                  size={19}
+                />
+              </Pressable>
+            ))}
+          <View style={[ui.row, { flexWrap: 'wrap', gap: 6 }]}>
+            {['', '2', '4', '6', '10'].map((value) => (
+              <Chip
+                key={value}
+                label={value ? `${value} people` : 'No limit'}
+                active={capacity === value}
+                onPress={() => setCapacity(value)}
               />
-            </Pressable>
-          ))}
+            ))}
+          </View>
           <Field
             label="Capacity including you (optional)"
             placeholder="No limit"
@@ -254,6 +340,14 @@ export function MeetupForm({
             onChangeText={setCapacity}
             keyboardType="number-pad"
             maxLength={7}
+          />
+          <Field
+            label="A little more (optional)"
+            placeholder="I’ll grab us a table…"
+            value={description}
+            onChangeText={setDescription}
+            maxLength={240}
+            multiline
           />
           <Txt weight="bold">Invite friends · {invites.length} selected</Txt>
           <View style={[ui.row, { flexWrap: 'wrap', gap: 8 }]}>

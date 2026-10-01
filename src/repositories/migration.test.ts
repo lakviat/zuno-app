@@ -23,7 +23,12 @@ describe('versioned local persistence', () => {
     const next = migrateSnapshot(old);
     const { plans: _plans, version: _version, ...before } = old;
     const { meetups: _meetups, version: _nextVersion, ...after } = next;
-    expect(after).toEqual(before);
+    expect({
+      ...after,
+      conversations: after.conversations.filter((c) => !c.meetupId),
+    }).toMatchObject(before);
+    expect(next.conversations.filter((c) => c.meetupId)).toHaveLength(old.plans.length);
+    expect(next.people[0].presence.availableUntil).toBeDefined();
     expect(next.version).toBe(2);
     expect(next.meetups.every((m) => m.visibility === 'friends')).toBe(true);
     expect(next.meetups[0].participantIds).toEqual(['alex']);
@@ -40,8 +45,9 @@ describe('versioned local persistence', () => {
     await repository.save(result.snapshot);
     const reopened = await new MockSocialRepository().load();
     expect(reopened.meetups[0].participantIds).toContain('me');
-    expect(reopened.messages).toEqual(old.messages);
-    expect(reopened.people).toEqual(old.people);
+    expect(reopened.messages.filter((m) => m.kind !== 'system')).toEqual(old.messages);
+    expect(reopened.messages.filter((m) => m.kind === 'system')).toHaveLength(1);
+    expect(reopened.people).toMatchObject(old.people);
     expect(JSON.parse(storage.get('zuno.demo.v1')!).version).toBe(2);
   });
 });

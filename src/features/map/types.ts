@@ -1,3 +1,4 @@
+import type { MapViewport } from '../../utils/geo';
 import type { Coordinate, Person, Meetup } from '../../types/domain';
 export const MIAMI = { latitude: 25.7885, longitude: -80.141 };
 export interface MapHandle {
@@ -12,6 +13,9 @@ export interface SocialMapProps {
   me: Person;
   meetups: Meetup[];
   dark: boolean;
+  onViewportChange?(viewport: MapViewport): void;
+  onLongPress?(coordinate: Coordinate): void;
+  onMoving?(): void;
   selectedId?: string;
   onPersonPress(id: string): void;
   onMeetupPress(id: string): void;

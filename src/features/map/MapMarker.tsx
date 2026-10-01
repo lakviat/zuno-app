@@ -1,10 +1,12 @@
+import { memo } from 'react';
+import { meetupLifecycle } from '../meetups/domain';
 import { Pressable, View } from 'react-native';
 import { Avatar, Txt } from '../../components/ui';
-import { useApp } from '../../state/AppContext';
+import { useTheme } from '../../state/AppContext';
 import { tokens } from '../../theme/tokens';
 import type { Person, Meetup } from '../../types/domain';
 
-export function FriendMarker({
+export const FriendMarker = memo(function FriendMarker({
   person,
   selected,
   onPress,
@@ -15,7 +17,7 @@ export function FriendMarker({
   onPress: () => void;
   compact?: boolean;
 }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -53,7 +55,11 @@ export function FriendMarker({
       <View
         style={{
           borderWidth: 3,
-          borderColor: selected ? colors.accent : colors.surface,
+          borderColor: selected
+            ? colors.accent
+            : person.mapAudience === 'public'
+              ? colors.green
+              : colors.surface,
           padding: 3,
           borderRadius: 50,
           backgroundColor: person.profile.color,
@@ -89,12 +95,13 @@ export function FriendMarker({
       >
         <Txt weight="bold" style={{ fontSize: 11 }}>
           {person.profile.displayName.split(' ')[0]}
+          {person.mapAudience === 'public' ? ' ≈' : ''}
         </Txt>
       </View>
     </Pressable>
   );
-}
-export function MeetupMarker({
+});
+export const MeetupMarker = memo(function MeetupMarker({
   meetup,
   onPress,
   compact = false,
@@ -103,7 +110,7 @@ export function MeetupMarker({
   onPress: () => void;
   compact?: boolean;
 }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -125,13 +132,25 @@ export function MeetupMarker({
       <Txt weight="bold" numberOfLines={1} style={{ fontSize: 11, maxWidth: 165 }}>
         {compact ? meetup.participantIds.length : meetup.title}
       </Txt>
-      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent }} />
+      {meetupLifecycle(meetup, Date.now()) === 'active' ? (
+        <Txt weight="bold" style={{ fontSize: 9, color: colors.green }}>
+          NOW
+        </Txt>
+      ) : (
+        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent }} />
+      )}
     </Pressable>
   );
-}
+});
 
-export function MeetupClusterMarker({ count, onPress }: { count: number; onPress(): void }) {
-  const { colors } = useApp();
+export const MeetupClusterMarker = memo(function MeetupClusterMarker({
+  count,
+  onPress,
+}: {
+  count: number;
+  onPress(): void;
+}) {
+  const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -155,4 +174,4 @@ export function MeetupClusterMarker({ count, onPress }: { count: number; onPress
       </Txt>
     </Pressable>
   );
-}
+});
