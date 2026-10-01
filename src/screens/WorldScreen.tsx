@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
-import { ActivityIndicator, BackHandler, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, BackHandler, Platform, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Chip, Icon, IconButton, Txt, ui } from '../components/ui';
@@ -7,6 +7,7 @@ import { useApp } from '../state/AppContext';
 import { SocialMap } from '../features/map/SocialMap';
 import type { MapHandle } from '../features/map/types';
 import { EdgeZoom } from '../features/map/EdgeZoom';
+import { ScreenEdgeZoom } from '../features/map/ScreenEdgeZoom';
 import { FriendCard } from '../features/friends/FriendCard';
 import { FriendsScreen } from '../features/friends/FriendsScreen';
 import { ChatScreen } from '../features/chat/ChatScreen';
@@ -39,7 +40,7 @@ export function WorldScreen() {
   const [route, setRoute] = useState<Route>({ name: 'map' });
   const [selected, setSelected] = useState<string>();
   const [filter, setFilter] = useState<'all' | 'free' | 'meetups'>('all');
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const map = useRef<MapHandle>(null);
   const previousArea = useRef(meetupAreaId);
@@ -119,6 +120,19 @@ export function WorldScreen() {
         onMeetupPress={(meetupId) => navigate({ name: 'meetups', meetupId })}
         onMeetupClusterPress={(clusterIds) => navigate({ name: 'meetups', clusterIds })}
       />
+      {Platform.OS === 'ios' && route.name === 'map' && (
+        <ScreenEdgeZoom
+          top={insets.top + (wide ? 86 : 70)}
+          bottom={bottom + 86}
+          height={height}
+          leftInset={insets.left}
+          rightInset={insets.right}
+          onZoom={zoomMap}
+          onBegin={beginZoom}
+          onUpdate={updateZoom}
+          onEnd={endZoom}
+        />
+      )}
       <Header wide={wide} top={insets.top} navigate={navigate} />
       {wide && personalView && (
         <WorldPanel top={top} navigate={navigate} selectPerson={selectPerson} />
@@ -195,12 +209,15 @@ export function WorldScreen() {
           style={{
             position: 'absolute',
             right: Math.max(insets.right + 16, wide ? 28 : 16),
-            top: '39%',
+            top: Platform.OS === 'ios' ? undefined : '39%',
+            bottom: Platform.OS === 'ios' ? bottom + 152 : undefined,
             gap: 10,
             alignItems: 'center',
           }}
         >
-          <EdgeZoom onZoom={zoomMap} onBegin={beginZoom} onUpdate={updateZoom} onEnd={endZoom} />
+          {Platform.OS !== 'ios' && (
+            <EdgeZoom onZoom={zoomMap} onBegin={beginZoom} onUpdate={updateZoom} onEnd={endZoom} />
+          )}
           <IconButton
             name="navigation"
             label="Recenter demo map"
