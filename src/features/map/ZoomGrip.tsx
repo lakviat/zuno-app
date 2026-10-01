@@ -17,19 +17,21 @@ export function ZoomGrip({ gesture, active, onStep, children }: ZoomGripProps) {
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel="One-handed map zoom. Slide up to zoom in, down to zoom out."
+      accessibilityHint="Swipe up or down to adjust the map zoom."
       accessibilityActions={[
         { name: 'increment', label: 'Zoom in' },
         { name: 'decrement', label: 'Zoom out' },
       ]}
-      onAccessibilityAction={(event) =>
-        onStep(event.nativeEvent.actionName === 'increment' ? 0.5 : -0.5)
-      }
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'increment') onStep(0.5);
+        if (event.nativeEvent.actionName === 'decrement') onStep(-0.5);
+      }}
       style={{
         width: 44,
-        height: 64,
+        height: 84,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 7,
+        gap: 4,
         borderRadius: 14,
         backgroundColor: active ? colors.accentSoft : colors.surface,
       }}

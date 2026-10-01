@@ -23,6 +23,7 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
   const back = () => navigate({ name: 'meetups' });
   const action = m && participationAction(state, meetupViewerId, m, now);
   const host = m && state.people.find((p) => p.user.id === m.hostId);
+  const canManage = !!m && canManageMeetup(m, meetupViewerId, now);
   const perform = (operation: 'join' | 'leave' | 'cancel') => {
     const result = runMeetup({ operation, id: meetupId });
     if (!result.ok) {
@@ -41,8 +42,8 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
   };
   return (
     <Sheet
-      title="A little get-together"
-      subtitle="Good company starts here."
+      title="Meetup"
+      subtitle={canManage ? 'You’re hosting · you’re in' : 'Good company starts here.'}
       back={back}
       onClose={() => navigate({ name: 'map' })}
       footer={
@@ -53,15 +54,21 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
                 {error}
               </Txt>
             )}
-            <Button
-              disabled={!action.operation}
-              icon={m.participantIds.includes(meetupViewerId) ? 'check' : 'plus'}
-              onPress={() => {
-                if (action.operation) perform(action.operation);
-              }}
-            >
-              {action.label}
-            </Button>
+            {canManage ? (
+              <Button icon="edit-2" onPress={() => navigate({ name: 'edit-meetup', meetupId })}>
+                Edit meetup
+              </Button>
+            ) : (
+              <Button
+                disabled={!action.operation}
+                icon={m.participantIds.includes(meetupViewerId) ? 'check' : 'plus'}
+                onPress={() => {
+                  if (action.operation) perform(action.operation);
+                }}
+              >
+                {action.label}
+              </Button>
+            )}
           </View>
         ) : undefined
       }
@@ -74,8 +81,8 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
         />
       ) : (
         <>
-          <View style={{ alignItems: 'center', paddingVertical: 10, gap: 12 }}>
-            <Txt style={{ fontSize: 54 }}>{m.emoji}</Txt>
+          <View style={{ alignItems: 'center', paddingVertical: 4, gap: 10 }}>
+            <Txt style={{ fontSize: 44 }}>{m.emoji}</Txt>
             <Txt weight="display" style={{ fontSize: 29, textAlign: 'center' }}>
               {m.title}
             </Txt>
@@ -127,7 +134,7 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
             <Txt weight="bold">{m.participantIds.length} going</Txt>
             <Txt muted style={{ fontSize: 12 }}>
               {m.capacity
-                ? `${Math.max(0, m.capacity - m.participantIds.length)} places left · ${m.capacity} total`
+                ? `${Math.max(0, m.capacity - m.participantIds.length)} ${m.capacity - m.participantIds.length === 1 ? 'place' : 'places'} left · ${m.capacity} total`
                 : 'Room for everyone'}
             </Txt>
           </View>
@@ -147,15 +154,8 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
                 )
               );
             })}
-          {canManageMeetup(m, meetupViewerId, now) && (
+          {canManage && (
             <View style={{ gap: 10 }}>
-              <Button
-                kind="secondary"
-                icon="edit-2"
-                onPress={() => navigate({ name: 'edit-meetup', meetupId: m.id })}
-              >
-                Edit meetup
-              </Button>
               {confirmCancel ? (
                 <View style={{ gap: 10 }}>
                   <Txt>Cancel for everyone? This meetup will leave active discovery.</Txt>

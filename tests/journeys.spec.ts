@@ -72,8 +72,9 @@ test('creates a public meetup, joins as a non-friend, persists, edits and cancel
     .getByRole('textbox', { name: 'Capacity including you (optional)', exact: true })
     .fill('2');
   await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'You’re hosting · you’re in' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Edit meetup', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Go back', exact: true }).click();
+  await page.getByRole('button', { name: 'Switch demo viewer' }).click();
   await page.getByRole('button', { name: 'View as Noah' }).click();
   await page.getByRole('button', { name: 'South Beach', exact: true }).click();
   await expect(page.getByRole('button', { name: 'View A sunny afternoon walk' })).toHaveCount(0);
@@ -84,6 +85,7 @@ test('creates a public meetup, joins as a non-friend, persists, edits and cancel
   await expect(page.getByText('2 going', { exact: true })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: 'Meetups', exact: true }).click();
+  await page.getByRole('button', { name: 'Switch demo viewer' }).click();
   await page.getByRole('button', { name: 'View as Noah' }).click();
   await page.getByRole('button', { name: 'View A sunny afternoon walk' }).click();
   await expect(page.getByRole('button', { name: 'Leave meetup', exact: true })).toBeVisible();
@@ -91,6 +93,7 @@ test('creates a public meetup, joins as a non-friend, persists, edits and cancel
   await expect(page.getByText('1 going', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Join meetup', exact: true }).click();
   await page.getByRole('button', { name: 'Go back', exact: true }).click();
+  await page.getByRole('button', { name: 'Switch demo viewer' }).click();
   await page.getByRole('button', { name: 'View as Maya' }).click();
   await page.getByRole('button', { name: 'View A sunny afternoon walk' }).click();
   await page.getByRole('button', { name: 'Edit meetup', exact: true }).click();
@@ -135,6 +138,29 @@ test('profile edits, dark mode, privacy and ghost mode', async ({ page }) => {
     'aria-checked',
     'true',
   );
+});
+
+test('meetup draft keeps its duration and requires an explicit discard', async ({ page }) => {
+  await page.getByRole('button', { name: 'Meetups', exact: true }).click();
+  await page.getByRole('button', { name: 'South Beach', exact: true }).click();
+  await page.getByRole('button', { name: 'Create a meetup', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Meetup title', exact: true }).fill('Draft to keep');
+  await page.getByLabel('Starts', { exact: true }).fill('2099-10-02T23:30');
+  await expect(page.getByLabel('Ends', { exact: true })).toHaveValue('2099-10-03T00:30');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByText('Discard your unsaved changes?', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(page.getByRole('textbox', { name: 'Meetup title', exact: true })).toHaveValue(
+    'Draft to keep',
+  );
+  await page.getByRole('button', { name: 'Go back', exact: true }).click();
+  await page.getByRole('button', { name: 'Discard changes' }).click();
+  await expect(page.getByRole('button', { name: 'View Draft to keep' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Create a meetup', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Meetup title', exact: true })).toBeEmpty();
+  await page.getByRole('textbox', { name: 'Meetup title', exact: true }).fill('A park meetup');
+  await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
+  await expect(page.getByText('Flamingo Park', { exact: true })).toBeVisible();
 });
 
 test('phone and tablet layouts keep navigation and sheets usable', async ({ page }) => {

@@ -17,6 +17,7 @@ import { listVisibleMeetups } from '../features/meetups/domain';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { PrivacyScreen } from '../features/privacy/PrivacyScreen';
 import { BottomNav, Header, MobilePeoplePill, WorldPanel } from './HomeChrome';
+import { SheetHost } from '../components/Sheet';
 import type { Route } from '../navigation/routes';
 import { tokens } from '../theme/tokens';
 
@@ -260,25 +261,27 @@ export function WorldScreen() {
           <Txt style={{ color: colors.surface, fontSize: 12 }}>{toast}</Txt>
         </View>
       )}
-      {route.name === 'friends' && <FriendsScreen navigate={navigate} />}
-      {route.name === 'inbox' && <ChatScreen friendId={route.friendId} navigate={navigate} />}
-      {route.name === 'meetups' && (
-        <MeetupsScreen
-          meetupId={route.meetupId}
-          clusterIds={route.clusterIds}
-          navigate={navigate}
-        />
-      )}
-      {route.name === 'create-meetup' && (
-        <MeetupForm key="create" friendId={route.friendId} navigate={navigate} />
-      )}
-      {route.name === 'edit-meetup' && (
-        <MeetupForm key={route.meetupId} meetupId={route.meetupId} navigate={navigate} />
-      )}
-      {route.name === 'profile' && (
-        <ProfileScreen key={route.userId ?? 'me'} userId={route.userId} navigate={navigate} />
-      )}
-      {route.name === 'privacy' && <PrivacyScreen navigate={navigate} />}
+      <SheetHost visible={route.name !== 'map'} onClose={() => navigate({ name: 'map' })}>
+        {route.name === 'friends' && <FriendsScreen navigate={navigate} />}
+        {route.name === 'inbox' && <ChatScreen friendId={route.friendId} navigate={navigate} />}
+        {route.name === 'meetups' && (
+          <MeetupsScreen
+            meetupId={route.meetupId}
+            clusterIds={route.clusterIds}
+            navigate={navigate}
+          />
+        )}
+        {route.name === 'create-meetup' && (
+          <MeetupForm key="create" friendId={route.friendId} navigate={navigate} />
+        )}
+        {route.name === 'edit-meetup' && (
+          <MeetupForm key={route.meetupId} meetupId={route.meetupId} navigate={navigate} />
+        )}
+        {route.name === 'profile' && (
+          <ProfileScreen key={route.userId ?? 'me'} userId={route.userId} navigate={navigate} />
+        )}
+        {route.name === 'privacy' && <PrivacyScreen navigate={navigate} />}
+      </SheetHost>
     </View>
   );
 }

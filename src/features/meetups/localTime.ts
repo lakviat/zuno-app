@@ -12,6 +12,16 @@ export function toInstant(value: string): string {
     : '';
 }
 export const localZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+/** Keep the chosen duration when the host moves the start date or time. */
+export function endAfterStartChange(start: string, end: string, nextStart: string): string {
+  const previousStart = Date.parse(toInstant(start));
+  const previousEnd = Date.parse(toInstant(end));
+  const next = Date.parse(toInstant(nextStart));
+  const duration = previousEnd - previousStart;
+  return Number.isFinite(next) && Number.isFinite(duration) && duration > 0
+    ? localDateTime(next + duration)
+    : end;
+}
 export const meetupTime = (instant: string) =>
   new Date(instant).toLocaleString(undefined, {
     month: 'short',

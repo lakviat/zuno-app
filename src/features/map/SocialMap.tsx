@@ -12,6 +12,7 @@ import { Avatar, Txt } from '../../components/ui';
 import { useApp } from '../../state/AppContext';
 import { FriendMarker, MeetupMarker, MeetupClusterMarker } from './MapMarker';
 import { createZoomCamera, MIN_ZOOM, MAX_ZOOM } from './zoom';
+import { createCameraSnapshot } from './cameraSnapshot';
 import { clusterMeetups } from './meetupClusters';
 import { clusterPeople } from './clusters';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
@@ -32,34 +33,48 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
     longitudeDelta: 0.05,
   });
   const regionRef = useRef(region);
-  const zoom = useMemo(
+  const cameraSnapshot = useMemo(
     () =>
-      createZoomCamera(
-        async () => {
-          if (!map.current) throw new Error('Map not ready');
-          const camera = await map.current.getCamera();
-          // Apple exposes altitude; Android exposes zoom. Normalize to the same zoom delta.
-          const level = camera.zoom ?? Math.log2(360 / regionRef.current.longitudeDelta);
-          return { ...camera, zoom: level };
-        },
-        (start, level) => {
-          map.current?.setCamera({
-            center: start.center,
-            heading: 0,
-            pitch: 0,
-            zoom: level,
-            ...(start.altitude ? { altitude: start.altitude * 2 ** (start.zoom - level) } : {}),
-          });
-        },
-      ),
+      createCameraSnapshot(async () => {
+        if (!map.current) throw new Error('Map not ready');
+        const camera = await map.current.getCamera();
+        // Apple exposes altitude; Android exposes zoom. Normalize the same zoom delta.
+        return {
+          ...camera,
+          zoom: camera.zoom ?? Math.log2(360 / regionRef.current.longitudeDelta),
+        };
+      }),
     [],
   );
-  useEffect(() => () => zoom.end(), [zoom]);
+  const zoom = useMemo(
+    () =>
+      createZoomCamera(cameraSnapshot.read, (start, level) => {
+        const next = {
+          ...start,
+          center: start.center,
+          heading: 0,
+          pitch: 0,
+          zoom: level,
+          ...(start.altitude ? { altitude: start.altitude * 2 ** (start.zoom - level) } : {}),
+        };
+        cameraSnapshot.write(next);
+        map.current?.setCamera(next);
+      }),
+    [cameraSnapshot],
+  );
+  useEffect(
+    () => () => {
+      zoom.end();
+      cameraSnapshot.invalidate();
+    },
+    [zoom, cameraSnapshot],
+  );
   useImperativeHandle(
     ref,
     () => ({
       recenter(coordinate = MIAMI) {
         zoom.end();
+        cameraSnapshot.invalidate();
         // Zero-duration moves cannot continue behind a new thumb gesture.
         map.current?.animateToRegion(
           { ...coordinate, latitudeDelta: 0.06, longitudeDelta: 0.05 },
@@ -73,7 +88,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
       updateZoom: zoom.update,
       endZoom: zoom.end,
     }),
-    [zoom],
+    [zoom, cameraSnapshot],
   );
   // The native viewport region provides a local screen approximation for clustering.
   // Provider-specific projection can replace this for globe/pitched views later.
@@ -101,14 +116,26 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
         // Android still waits for tiles so a Google Maps authorization failure stays visible.
         onMapReady={() => {
           if (Platform.OS === 'ios') setMapReady(true);
+          cameraSnapshot.refresh();
         }}
         onMapLoaded={() => setMapReady(true)}
         onRegionChange={(next) => {
+          // Ignore repeated native notifications for the same resting viewport.
+          if (
+            Object.keys(next).some(
+              (key) =>
+                Math.abs(next[key as keyof Region] - regionRef.current[key as keyof Region]) > 1e-7,
+            )
+          ) {
+            cameraSnapshot.invalidate();
+          }
           regionRef.current = next;
         }}
         onRegionChangeComplete={(next) => {
           regionRef.current = next;
           setRegion(next);
+          cameraSnapshot.invalidate();
+          cameraSnapshot.refresh();
         }}
         minZoomLevel={MIN_ZOOM}
         maxZoomLevel={MAX_ZOOM}

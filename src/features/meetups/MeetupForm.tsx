@@ -1,14 +1,14 @@
-import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Keyboard, Pressable, View } from 'react-native';
 import { Button, Chip, EmptyState, Field, Icon, Txt, ui } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { useApp } from '../../state/AppContext';
-import type { Navigate } from '../../navigation/routes';
+import type { Navigate, Route } from '../../navigation/routes';
 import type { MeetupDraft, MeetupVisibility } from '../../types/domain';
 import { uid } from '../../utils/time';
 import { areFriends, blockedBetween, canManageMeetup, getAuthorizedMeetup } from './domain';
 import { activities, audienceLabels, meetupPlaces } from './places';
-import { localDateTime, localZone, toInstant } from './localTime';
+import { endAfterStartChange, localDateTime, localZone, toInstant } from './localTime';
 import { DateTimeField } from './DateTimeField';
 
 export function MeetupForm({
@@ -20,21 +20,48 @@ export function MeetupForm({
   meetupId?: string;
   navigate: Navigate;
 }) {
-  const { state, now, meetupViewerId, runMeetup, colors, notify } = useApp();
+  const { state, now, meetupViewerId, meetupAreaId, setMeetupAreaId, runMeetup, colors, notify } =
+    useApp();
   const existing = meetupId ? getAuthorizedMeetup(state, meetupViewerId, meetupId) : undefined;
   const [title, setTitle] = useState(existing?.title ?? '');
   const [description, setDescription] = useState(existing?.description ?? '');
   const [emoji, setEmoji] = useState(existing?.emoji ?? '☕');
-  const [placeId, setPlaceId] = useState(existing?.place.id ?? meetupPlaces[0].id);
-  const [start, setStart] = useState(() =>
-    localDateTime(existing?.startsAt ?? Date.now() + 3600000),
+  const [placeId, setPlaceId] = useState(
+    existing?.place.id ??
+      meetupPlaces.find((p) => p.areaId === meetupAreaId)?.id ??
+      meetupPlaces[0].id,
   );
-  const [end, setEnd] = useState(() => localDateTime(existing?.endsAt ?? Date.now() + 7200000));
+  const [defaultStart] = useState(() => Math.ceil((Date.now() + 3600000) / 900000) * 900000);
+  const [start, setStart] = useState(() => localDateTime(existing?.startsAt ?? defaultStart));
+  const [end, setEnd] = useState(() => localDateTime(existing?.endsAt ?? defaultStart + 3600000));
   const [visibility, setVisibility] = useState<MeetupVisibility>(existing?.visibility ?? 'friends');
   const [invites, setInvites] = useState(existing?.invitedUserIds ?? (friendId ? [friendId] : []));
   const [capacity, setCapacity] = useState(existing?.capacity?.toString() ?? '');
-  const [error, setError] = useState('');
+  const [validation, setValidation] = useState<{ message: string; values: string }>();
   const [id] = useState(() => meetupId ?? uid());
+  const [leaveTo, setLeaveTo] = useState<Route | null>(null);
+  const formValues = JSON.stringify({
+    title,
+    description,
+    emoji,
+    placeId,
+    start,
+    end,
+    visibility,
+    invites,
+    capacity,
+  });
+  const initialValues = useRef(formValues);
+  const error = validation?.values === formValues ? validation.message : '';
+  const requestLeave = (route: Route) => {
+    Keyboard.dismiss();
+    if (initialValues.current !== formValues) setLeaveTo(route);
+    else navigate(route);
+  };
+  const changeStart = (next: string) => {
+    setEnd(endAfterStartChange(start, end, next));
+    setStart(next);
+  };
   const friends = state.people.filter(
     (p) =>
       areFriends(state, meetupViewerId, p.user.id) &&
@@ -42,6 +69,7 @@ export function MeetupForm({
   );
   const allowed = !meetupId || (existing && canManageMeetup(existing, meetupViewerId, now));
   const save = () => {
+    Keyboard.dismiss();
     const draft: MeetupDraft = {
       title,
       description,
@@ -59,29 +87,46 @@ export function MeetupForm({
     };
     const result = runMeetup({ operation: meetupId ? 'edit' : 'create', id, draft });
     if (!result.ok) {
-      setError(result.error);
+      setValidation({ message: result.error, values: formValues });
       return;
     }
     notify(meetupId ? 'Meetup updated.' : 'A little idea, a good get-together. Saved locally.');
+    setMeetupAreaId(result.meetup.place.areaId);
     navigate({ name: 'meetups', meetupId: result.meetup.id });
   };
   return (
     <Sheet
-      title={meetupId ? 'Edit meetup' : 'Make a little meetup'}
+      title={meetupId ? 'Edit meetup' : 'New meetup'}
       subtitle={`Hosted by ${state.people.find((p) => p.user.id === meetupViewerId)?.profile.displayName ?? 'you'}`}
-      back={() => navigate({ name: 'meetups', meetupId })}
-      onClose={() => navigate({ name: 'map' })}
+      back={() => requestLeave({ name: 'meetups', meetupId })}
+      onClose={() => requestLeave({ name: 'map' })}
       footer={
         allowed ? (
           <View style={{ gap: 10 }}>
-            {!!error && (
-              <Txt accessibilityRole="alert" style={{ color: colors.accent, fontSize: 12 }}>
-                {error}
-              </Txt>
+            {leaveTo ? (
+              <>
+                <Txt weight="bold">Discard your unsaved changes?</Txt>
+                <View style={[ui.row, { gap: 8 }]}>
+                  <Button kind="secondary" style={{ flex: 1 }} onPress={() => setLeaveTo(null)}>
+                    Keep editing
+                  </Button>
+                  <Button kind="danger" style={{ flex: 1 }} onPress={() => navigate(leaveTo)}>
+                    Discard changes
+                  </Button>
+                </View>
+              </>
+            ) : (
+              <>
+                {!!error && (
+                  <Txt accessibilityRole="alert" style={{ color: colors.accent, fontSize: 12 }}>
+                    {error}
+                  </Txt>
+                )}
+                <Button icon="arrow-right" onPress={save}>
+                  {meetupId ? 'Save changes' : 'Create meetup'}
+                </Button>
+              </>
             )}
-            <Button icon="arrow-right" onPress={save}>
-              {meetupId ? 'Save changes' : 'Create meetup'}
-            </Button>
           </View>
         ) : undefined
       }
@@ -121,6 +166,7 @@ export function MeetupForm({
             value={title}
             onChangeText={setTitle}
             maxLength={60}
+            autoCapitalize="sentences"
           />
           <Field
             label="A little more (optional)"
@@ -130,10 +176,25 @@ export function MeetupForm({
             maxLength={240}
             multiline
           />
-          <DateTimeField label="Starts" value={start} onChange={setStart} />
+          <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
+            <Chip
+              label="In 30 min"
+              icon="clock"
+              onPress={() =>
+                changeStart(localDateTime(Math.ceil((Date.now() + 1800000) / 300000) * 300000))
+              }
+            />
+            <Chip
+              label="In 1 hour"
+              onPress={() =>
+                changeStart(localDateTime(Math.ceil((Date.now() + 3600000) / 300000) * 300000))
+              }
+            />
+          </View>
+          <DateTimeField label="Starts" value={start} onChange={changeStart} />
           <DateTimeField label="Ends" value={end} onChange={setEnd} />
           <Txt muted style={{ fontSize: 11 }}>
-            Times are in {localZone()}. Invites won’t join anyone automatically.
+            {localZone().replaceAll('_', ' ')} · Changing the start keeps your duration.
           </Txt>
           <Txt weight="bold">Who can see and join?</Txt>
           <View style={[ui.row, { flexWrap: 'wrap', gap: 7 }]}>

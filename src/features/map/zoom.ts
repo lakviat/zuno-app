@@ -74,15 +74,18 @@ export function createZoomCamera<T extends { zoom: number }>(
         end();
         return;
       }
-      Promise.resolve(reading)
-        .then((camera) => {
-          if (token !== generation) return;
-          start = camera;
-          if (pending !== 0) update(pending);
-        })
-        .catch(() => {
-          if (token === generation) end();
-        });
+      const accept = (camera: T) => {
+        if (token !== generation) return;
+        start = camera;
+        if (pending !== 0) update(pending);
+      };
+      if (!(reading instanceof Promise)) {
+        accept(reading);
+        return;
+      }
+      reading.then(accept).catch(() => {
+        if (token === generation) end();
+      });
     },
     update,
     end,

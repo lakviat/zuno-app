@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Platform,
   View,
   type StyleProp,
   type TextStyle,
@@ -129,6 +130,7 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={children}
+      accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -217,7 +219,7 @@ export function Chip({
       accessibilityState={{ selected: active }}
       onPress={onPress}
       style={({ pressed }) => ({
-        minHeight: 40,
+        minHeight: 44,
         paddingHorizontal: compact ? 12 : 15,
         borderRadius: 99,
         flexDirection: 'row',
@@ -245,6 +247,8 @@ export function Field({ label, style, ...props }: TextInputProps & { label?: str
         </Txt>
       )}
       <TextInput
+        inputAccessoryViewID={Platform.OS === 'ios' ? 'zuno-keyboard-done' : undefined}
+        returnKeyType={props.multiline ? 'default' : 'done'}
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? label}
         placeholderTextColor={colors.muted}

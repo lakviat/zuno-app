@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { createContext, useContext, useEffect, useRef } from 'react';
 import {
   KeyboardAvoidingView,
+  InputAccessoryView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -13,6 +15,32 @@ import { useApp } from '../state/AppContext';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { tokens } from '../theme/tokens';
 import { IconButton, Txt, ui } from './ui';
+
+const CloseContext = createContext<React.RefObject<(() => void) | undefined> | null>(null);
+
+/** Keep one native presentation alive while navigating between sheets. */
+export function SheetHost({
+  visible,
+  onClose,
+  children,
+}: React.PropsWithChildren<{
+  visible: boolean;
+  onClose(): void;
+}>) {
+  const close = useRef<(() => void) | undefined>(undefined);
+  const reduced = useReducedMotion();
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType={reduced ? 'none' : 'fade'}
+      onRequestClose={() => (close.current ?? onClose)()}
+      statusBarTranslucent
+    >
+      <CloseContext.Provider value={close}>{children}</CloseContext.Provider>
+    </Modal>
+  );
+}
 
 export function Sheet({
   title,
@@ -31,18 +59,19 @@ export function Sheet({
   scroll?: boolean;
 }>) {
   const { colors, toast } = useApp();
-  const reduced = useReducedMotion();
+  const closeRef = useContext(CloseContext);
+  useEffect(() => {
+    if (!closeRef) return;
+    closeRef.current = onClose;
+    return () => {
+      if (closeRef.current === onClose) closeRef.current = undefined;
+    };
+  }, [closeRef, onClose]);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const wide = width >= 720;
   return (
-    <Modal
-      visible
-      transparent
-      animationType={reduced ? 'none' : 'fade'}
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
+    <>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{
@@ -63,6 +92,8 @@ export function Sheet({
           style={{
             width: wide ? 480 : '100%',
             height: Math.min(height * (wide ? 0.84 : 0.88), 760),
+            maxHeight: '100%',
+            flexShrink: 1,
             backgroundColor: colors.surface,
             borderRadius: 28,
             borderBottomLeftRadius: wide ? 28 : 0,
@@ -118,6 +149,7 @@ export function Sheet({
           {scroll ? (
             <ScrollView
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               contentContainerStyle={{ padding: 24, gap: 20 }}
               showsVerticalScrollIndicator={false}
             >
@@ -156,6 +188,22 @@ export function Sheet({
           </View>
         )}
       </KeyboardAvoidingView>
-    </Modal>
+      {Platform.OS === 'ios' && (
+        <InputAccessoryView nativeID="zuno-keyboard-done" backgroundColor={colors.surface}>
+          <View style={{ alignItems: 'flex-end', borderTopWidth: 1, borderColor: colors.line }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Done editing"
+              onPress={Keyboard.dismiss}
+              style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 24 }}
+            >
+              <Txt weight="bold" style={{ color: colors.accent }}>
+                Done
+              </Txt>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      )}
+    </>
   );
 }

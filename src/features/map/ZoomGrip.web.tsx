@@ -65,12 +65,12 @@ export function ZoomGrip({ gesture, active, onStep, children }: ZoomGripProps) {
       }}
       style={{
         width: 44,
-        height: 64,
+        height: 84,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 7,
+        gap: 4,
         borderRadius: 14,
         background: active ? colors.accentSoft : colors.surface,
         touchAction: 'none',

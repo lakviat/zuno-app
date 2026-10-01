@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { View } from 'react-native';
-import { Button, Chip, EmptyState, Txt, ui } from '../../components/ui';
+import { Pressable, View } from 'react-native';
+import { Button, Chip, EmptyState, Icon, Txt, ui } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { useApp } from '../../state/AppContext';
 import type { Navigate } from '../../navigation/routes';
@@ -20,6 +20,10 @@ export function MeetupsScreen({
   const { state, now, colors, meetupViewerId, setMeetupViewerId, meetupAreaId, setMeetupAreaId } =
     useApp();
   const [filter, setFilter] = useState<MeetupFilter>('all');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const viewerName =
+    state.people.find((p) => p.user.id === meetupViewerId)?.profile.displayName.split(' ')[0] ??
+    'Maya';
   if (meetupId) return <MeetupDetail meetupId={meetupId} navigate={navigate} />;
   const visible = listVisibleMeetups(state, meetupViewerId, { now, filter, areaId: meetupAreaId });
   const meetups = clusterIds ? visible.filter((m) => clusterIds.includes(m.id)) : visible;
@@ -34,42 +38,76 @@ export function MeetupsScreen({
         </Button>
       }
     >
-      <View style={{ backgroundColor: colors.accentSoft, padding: 15, borderRadius: 18, gap: 10 }}>
-        <Txt weight="bold" style={{ fontSize: 12 }}>
-          Try another point of view · local demo
-        </Txt>
-        <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
-          {['me', 'noah'].map((id) => (
-            <Chip
-              key={id}
-              label={`View as ${state.people.find((p) => p.user.id === id)?.profile.displayName.split(' ')[0] ?? id}`}
-              active={meetupViewerId === id}
-              onPress={() => setMeetupViewerId(id)}
-            />
-          ))}
-        </View>
-        <Txt muted style={{ fontSize: 11, lineHeight: 16 }}>
-          This changes only the meetup viewer. Noah starts as a non-friend. Personal map pins are
-          hidden in his preview.
-        </Txt>
+      <View style={{ gap: 8 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Switch demo viewer"
+          accessibilityState={{ expanded: previewOpen }}
+          onPress={() => setPreviewOpen(!previewOpen)}
+          style={[
+            ui.between,
+            {
+              minHeight: 44,
+              paddingHorizontal: 14,
+              borderRadius: 14,
+              backgroundColor: colors.raised,
+            },
+          ]}
+        >
+          <Txt muted style={{ fontSize: 12 }}>
+            Viewing as{' '}
+            <Txt weight="bold" style={{ fontSize: 12 }}>
+              {viewerName}
+            </Txt>{' '}
+            · Local demo
+          </Txt>
+          <Icon name={previewOpen ? 'chevron-up' : 'repeat'} size={16} />
+        </Pressable>
+        {previewOpen && (
+          <View
+            style={{ padding: 12, backgroundColor: colors.accentSoft, borderRadius: 14, gap: 10 }}
+          >
+            <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
+              {['me', 'noah'].map((id) => (
+                <Chip
+                  key={id}
+                  label={`View as ${state.people.find((p) => p.user.id === id)?.profile.displayName.split(' ')[0] ?? id}`}
+                  active={meetupViewerId === id}
+                  onPress={() => {
+                    setMeetupViewerId(id);
+                    setPreviewOpen(false);
+                  }}
+                />
+              ))}
+            </View>
+            <Txt muted style={{ fontSize: 11, lineHeight: 16 }}>
+              Try Noah to see what a non-friend can discover. His preview hides personal map pins.
+            </Txt>
+          </View>
+        )}
       </View>
       {clusterIds && (
         <Button kind="secondary" onPress={() => navigate({ name: 'meetups' })}>
           Show all meetups
         </Button>
       )}
-      <Txt weight="bold" style={{ fontSize: 12 }}>
-        Browse an area
-      </Txt>
-      <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
-        {demoAreas.map((a) => (
-          <Chip
-            key={a.id}
-            label={a.name}
-            active={a.id === meetupAreaId}
-            onPress={() => setMeetupAreaId(a.id)}
-          />
-        ))}
+      <View style={{ gap: 8 }}>
+        <View style={[ui.row, { gap: 6 }]}>
+          <Icon name="map-pin" size={14} />
+          <Txt weight="bold" style={{ fontSize: 12 }}>
+            Meeting area
+          </Txt>
+        </View>
+        <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
+          {demoAreas.map((a) => (
+            <Chip
+              key={a.id}
+              label={a.name}
+              active={a.id === meetupAreaId}
+              onPress={() => setMeetupAreaId(a.id)}
+            />
+          ))}
+        </View>
       </View>
       <View style={[ui.row, { flexWrap: 'wrap', gap: 7 }]}>
         {(

@@ -4,7 +4,7 @@ export const palette = {
     surface: '#FFFFFF',
     raised: '#F5F4F0',
     ink: '#282D2A',
-    muted: '#858A83',
+    muted: '#69736B',
     line: '#EAECE5',
     accent: '#F26B50',
     accentSoft: '#FFF0EA',
