@@ -1,3 +1,4 @@
+import { useAvatarUrl } from '../backend/useAvatarUrl';
 import React from 'react';
 import {
   Image,
@@ -61,7 +62,8 @@ export function Avatar({
   online?: boolean;
 }) {
   const { colors } = useTheme();
-  const source = avatars[person.profile.avatar];
+  const avatarUrl = useAvatarUrl(person.profile.avatar);
+  const source = avatarUrl ? { uri: avatarUrl } : avatars[person.profile.avatar];
   return (
     <View style={{ width: size, height: size }}>
       <View

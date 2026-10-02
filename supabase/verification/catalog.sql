@@ -1,0 +1,15 @@
+-- Read-only structural inventory. No user rows, credentials or auth tokens.
+with relations as (
+ select c.oid,n.nspname,c.relname,c.relrowsecurity,c.relpersistence from pg_class c join pg_namespace n on n.oid=c.relnamespace
+ where c.relkind='r' and ((n.nspname='public' and c.relname like 'zuno_%') or n.nspname='zuno_private') and c.relname<>'deployment_log'
+), inventory as (
+ select 'table' kind,nspname||'.'||relname name,jsonb_build_object('rls',relrowsecurity,'persistence',relpersistence,'anon_select',has_table_privilege('anon',oid,'SELECT'),'auth_select',has_table_privilege('authenticated',oid,'SELECT'),'auth_insert',has_table_privilege('authenticated',oid,'INSERT'),'auth_update',has_table_privilege('authenticated',oid,'UPDATE'),'auth_delete',has_table_privilege('authenticated',oid,'DELETE')) value from relations
+ union all select 'column',r.nspname||'.'||r.relname||'.'||a.attname,jsonb_build_object('type',format_type(a.atttypid,a.atttypmod),'not_null',a.attnotnull,'default',pg_get_expr(d.adbin,d.adrelid)) from relations r join pg_attribute a on a.attrelid=r.oid left join pg_attrdef d on d.adrelid=r.oid and d.adnum=a.attnum where a.attnum>0 and not a.attisdropped
+ union all select 'constraint',r.nspname||'.'||r.relname||'.'||c.conname,to_jsonb(pg_get_constraintdef(c.oid)) from relations r join pg_constraint c on c.conrelid=r.oid
+ union all select 'index',schemaname||'.'||indexname,to_jsonb(indexdef) from pg_indexes where (schemaname='public' and tablename like 'zuno_%') or (schemaname='zuno_private' and tablename<>'deployment_log')
+ union all select 'policy',schemaname||'.'||tablename||'.'||policyname,jsonb_build_object('roles',roles,'command',cmd,'permissive',permissive,'using',qual,'check',with_check) from pg_policies where policyname like 'zuno_%'
+ union all select 'function',n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',jsonb_build_object('definition_md5',md5(p.prosrc),'definer',p.prosecdef,'config',p.proconfig,'returns',pg_get_function_result(p.oid),'anon_execute',has_function_privilege('anon',p.oid,'EXECUTE'),'auth_execute',has_function_privilege('authenticated',p.oid,'EXECUTE')) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where (n.nspname='public' and p.proname like 'zuno_%') or n.nspname='zuno_private'
+ union all select 'trigger',n.nspname||'.'||c.relname||'.'||t.tgname,to_jsonb(pg_get_triggerdef(t.oid)) from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace n on n.oid=c.relnamespace where not t.tgisinternal and t.tgname like 'zuno_%'
+ union all select 'bucket',id,jsonb_build_object('public',public,'bytes',file_size_limit,'mime',allowed_mime_types) from storage.buckets where id='zuno-avatars'
+ union all select 'cron',jobname,jsonb_build_object('schedule',schedule,'command',command,'active',active) from cron.job where jobname='zuno-expire-location-state'
+) select jsonb_agg(jsonb_build_object('kind',kind,'name',name,'value',value) order by kind,name)::text as audit_json from inventory;

@@ -21,6 +21,14 @@ export function publicLocation(location: Location): Location {
 }
 /** Only safe map-facing projections leave this boundary. No stranger receives friend coordinates. */
 export function discoverablePeople(state: AppSnapshot, now: number): Person[] {
+  if (state.dataMode === 'cloud')
+    return state.people.filter(
+      (p) =>
+        p.user.id !== state.currentUserId &&
+        !isBlocked(state, p.user.id) &&
+        p.location &&
+        now - Date.parse(p.location.updatedAt) < 90000,
+    );
   return state.people.flatMap((p) => {
     if (
       p.user.id === state.currentUserId ||

@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 export function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
@@ -9,4 +10,4 @@ export function planTime(iso: string) {
       : d.toLocaleDateString([], { weekday: 'short' });
   return `${day} · ${timeLabel(iso)}`;
 }
-export const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+export const uid = () => randomUUID();

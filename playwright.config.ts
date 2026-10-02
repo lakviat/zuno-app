@@ -14,9 +14,9 @@ export default defineConfig({
     launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH },
   },
   webServer: {
-    command: 'node node_modules/expo/bin/cli start --web --port 8081',
+    command: 'node scripts/test-web-server.mjs',
     url: 'http://localhost:8081',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 90000,
   },
 });

@@ -1,3 +1,4 @@
+import { CloudPrivacyScreen } from './CloudPrivacyScreen';
 import { useState } from 'react';
 import { Pressable, Switch, View } from 'react-native';
 import { Button, Chip, Icon, Txt, ui, type IconName } from '../../components/ui';
@@ -10,7 +11,7 @@ import type { LocationPrecision } from '../../types/domain';
 import type { Navigate } from '../../navigation/routes';
 
 export function PrivacyScreen({ navigate }: { navigate: Navigate }) {
-  const { now, state, friends, dispatch, colors, notify } = useApp();
+  const { now, state, friends, dispatch, colors, notify, cloud } = useApp();
   const [selected, setSelected] = useState<string[]>([]);
   const live = useLiveLocation();
   const sample = useMotion(state.currentUserId);
@@ -38,6 +39,7 @@ export function PrivacyScreen({ navigate }: { navigate: Navigate }) {
   const blocked = state.people.filter((p) =>
     state.blocks.some((b) => b.blockerId === state.currentUserId && b.blockedId === p.user.id),
   );
+  if (cloud) return <CloudPrivacyScreen navigate={navigate} />;
   return (
     <Sheet
       title="Your space, your rules"
@@ -70,7 +72,7 @@ export function PrivacyScreen({ navigate }: { navigate: Navigate }) {
           accessibilityLabel="Ghost mode"
           value={privacy.ghostMode}
           onValueChange={(value) =>
-            dispatch({ type: 'privacy', value: { ...privacy, ghostMode: value } })
+            void dispatch({ type: 'privacy', value: { ...privacy, ghostMode: value } })
           }
           trackColor={{ true: colors.accent, false: colors.line }}
         />

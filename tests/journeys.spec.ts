@@ -317,3 +317,23 @@ test('map-native Now meetup, group chat, availability and public discovery contr
   await page.getByRole('button', { name: 'Meetup chat Coffee right now', exact: true }).click();
   await expect(page.getByText('I am by the entrance.', { exact: true })).toBeVisible();
 });
+
+test('account entry explains sharing consent and configured sign-in availability', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Your profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Your Zuno account', exact: true }).click();
+  await expect(
+    page.getByText('Your location stays private until you explicitly enable sharing.', {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Open the iOS app to sign in|Online accounts are not enabled in this build/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Email me a sign-in link', exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Your profile', exact: true })).toBeVisible();
+});

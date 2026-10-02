@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Avatar, Button, Chip, EmptyState, Field, Icon, Txt, ui } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
@@ -7,9 +7,16 @@ import { isBlocked } from '../../utils/privacy';
 import type { Navigate } from '../../navigation/routes';
 
 export function FriendsScreen({ navigate }: { navigate: Navigate }) {
-  const { state, friends, dispatch, colors } = useApp();
+  const { state, friends, dispatch, colors, search: searchCloud, cloud } = useApp();
   const [tab, setTab] = useState('Your friends');
   const [search, setSearch] = useState('');
+  useEffect(() => {
+    if (!cloud || tab !== 'Find people') return;
+    const timer = setTimeout(() => {
+      void searchCloud(search);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [cloud, search, tab, searchCloud]);
   const requests = state.friendships.filter((f) => f.status === 'pending');
   const people = (
     tab === 'Your friends'
@@ -117,7 +124,9 @@ export function FriendsScreen({ navigate }: { navigate: Navigate }) {
       })}
       {tab === 'Find people' && (
         <Txt muted style={{ fontSize: 12, lineHeight: 19 }}>
-          Search the demo directory by name. People outside your circle never show a location.
+          {cloud
+            ? 'Search an exact username to find someone new. Friends can also be found by name.'
+            : 'Search the demo directory by name. People outside your circle never show a location.'}
         </Txt>
       )}
     </Sheet>

@@ -95,7 +95,7 @@ export const FriendMarker = memo(function FriendMarker({
       >
         <Txt weight="bold" style={{ fontSize: 11 }}>
           {person.profile.displayName.split(' ')[0]}
-          {person.mapAudience === 'public' ? ' ≈' : ''}
+          {person.location?.precision === 'approximate' ? ' ≈' : ''}
         </Txt>
       </View>
     </Pressable>

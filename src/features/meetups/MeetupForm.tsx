@@ -76,7 +76,7 @@ export function MeetupForm({
       !blockedBetween(state, meetupViewerId, p.user.id),
   );
   const allowed = !meetupId || (existing && canManageMeetup(existing, meetupViewerId, now));
-  const save = () => {
+  const save = async () => {
     Keyboard.dismiss();
     const draft: MeetupDraft = {
       title,
@@ -95,12 +95,18 @@ export function MeetupForm({
           : NaN
         : undefined,
     };
-    const result = runMeetup({ operation: meetupId ? 'edit' : 'create', id, draft });
+    const result = await runMeetup({ operation: meetupId ? 'edit' : 'create', id, draft });
     if (!result.ok) {
       setValidation({ message: result.error, values: formValues });
       return;
     }
-    notify(meetupId ? 'Meetup updated.' : 'A little idea, a good get-together. Saved locally.');
+    notify(
+      meetupId
+        ? 'Meetup updated.'
+        : state.dataMode === 'cloud'
+          ? 'Meetup created and shared.'
+          : 'A little idea, a good get-together. Saved locally.',
+    );
     if (result.meetup.place.kind !== 'map-pin') setMeetupAreaId(result.meetup.place.areaId);
     navigate({ name: 'meetups', meetupId: result.meetup.id });
   };
@@ -270,7 +276,7 @@ export function MeetupForm({
           </View>
           <Txt muted style={{ fontSize: 12, lineHeight: 18 }}>
             {visibility === 'public'
-              ? 'Anyone browsing this demo area can see and join. Only your chosen meeting spot is published.'
+              ? 'Anyone browsing this area can see and join. Only your chosen meeting spot is published.'
               : visibility === 'friends'
                 ? 'Your accepted friends can discover and join.'
                 : 'Only you and the friends you invite can see or join.'}
@@ -366,9 +372,7 @@ export function MeetupForm({
               />
             ))}
           </View>
-          {friends.length === 0 && (
-            <Txt muted>This demo viewer has no accepted friends to invite yet.</Txt>
-          )}
+          {friends.length === 0 && <Txt muted>You have no accepted friends to invite yet.</Txt>}
         </>
       )}
     </Sheet>

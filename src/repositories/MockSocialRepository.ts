@@ -6,10 +6,14 @@ import type { SocialRepository } from './SocialRepository';
 
 const KEY = 'zuno.demo.v1';
 export class MockSocialRepository implements SocialRepository {
+  constructor(
+    private readonly key = KEY,
+    private readonly seed = createSeed,
+  ) {}
   private queue: Promise<void> = Promise.resolve();
   async load(): Promise<AppSnapshot> {
-    const raw = await AsyncStorage.getItem(KEY);
-    if (!raw) return createSeed();
+    const raw = await AsyncStorage.getItem(this.key);
+    if (!raw) return this.seed();
     try {
       const data = JSON.parse(raw) as AppSnapshot | LegacySnapshot;
       if (
@@ -23,7 +27,7 @@ export class MockSocialRepository implements SocialRepository {
         !Array.isArray(data.blocks) ||
         !Array.isArray(data.reports)
       )
-        return createSeed();
+        return this.seed();
       // Restarting the demo never silently resumes precise or temporary sharing.
       const migrated = migrateSnapshot(data);
       return {
@@ -31,17 +35,17 @@ export class MockSocialRepository implements SocialRepository {
         privacy: { ...migrated.privacy, mode: 'hidden', temporary: undefined },
       };
     } catch {
-      return createSeed();
+      return this.seed();
     }
   }
   save(snapshot: AppSnapshot) {
     this.queue = this.queue
       .catch(() => undefined)
-      .then(() => AsyncStorage.setItem(KEY, JSON.stringify(snapshot)));
+      .then(() => AsyncStorage.setItem(this.key, JSON.stringify(snapshot)));
     return this.queue;
   }
   async clear() {
     await this.queue.catch(() => undefined);
-    await AsyncStorage.removeItem(KEY);
+    await AsyncStorage.removeItem(this.key);
   }
 }

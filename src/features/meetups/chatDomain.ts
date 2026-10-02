@@ -76,6 +76,9 @@ export function meetupMessages(state: AppSnapshot, actor: string, id: string) {
   if (!canReadMeetupChat(state, actor, id)) return [];
   return state.messages.filter(
     (m) =>
-      m.conversationId === meetupConversationId(id) && !blockedBetween(state, actor, m.senderId),
+      m.conversationId ===
+        (state.dataMode === 'cloud'
+          ? state.conversations.find((c) => c.meetupId === id)?.id
+          : meetupConversationId(id)) && !blockedBetween(state, actor, m.senderId),
   );
 }

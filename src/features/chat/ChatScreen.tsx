@@ -1,3 +1,4 @@
+import { OlderMessages } from './OlderMessages';
 import { canReadMeetupChat } from '../meetups/chatDomain';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -11,10 +12,12 @@ import type { Navigate } from '../../navigation/routes';
 export function ChatScreen({ friendId, navigate }: { friendId?: string; navigate: Navigate }) {
   const { state, dispatch, colors } = useApp();
   const [text, setText] = useState('');
+  const sending = useRef(false);
+  const lastScrolledMessage = useRef<string | undefined>(undefined);
   const scroll = useRef<ScrollView>(null);
   const person = state.people.find((p) => p.user.id === friendId);
   const conversation = state.conversations.find(
-    (c) => friendId && c.participantIds.includes(friendId),
+    (c) => !c.meetupId && friendId && c.participantIds.includes(friendId),
   );
   const conversationId = conversation?.id ?? `c-${friendId}`;
   const messages = state.messages.filter((m) => m.conversationId === conversationId);
@@ -22,21 +25,27 @@ export function ChatScreen({ friendId, navigate }: { friendId?: string; navigate
   useEffect(() => {
     if (friendId && conversation?.unreadCount) dispatch({ type: 'read', conversationId });
   }, [friendId, conversation?.unreadCount, conversationId, dispatch]);
-  const send = () => {
-    if (!text.trim() || !friendId || !canSend) return;
-    dispatch({
-      type: 'message',
-      friendId,
-      message: {
-        id: uid(),
-        conversationId,
-        senderId: state.currentUserId,
-        text,
-        createdAt: new Date().toISOString(),
-        state: 'sent',
-      },
-    });
-    setText('');
+  const send = async () => {
+    if (sending.current || !text.trim() || !friendId || !canSend) return;
+    sending.current = true;
+    const draft = text;
+    try {
+      const saved = await dispatch({
+        type: 'message',
+        friendId,
+        message: {
+          id: uid(),
+          conversationId,
+          senderId: state.currentUserId,
+          text,
+          createdAt: new Date().toISOString(),
+          state: 'sent',
+        },
+      });
+      if (saved) setText((current) => (current === draft ? '' : current));
+    } finally {
+      sending.current = false;
+    }
   };
   if (!person)
     return (
@@ -109,7 +118,9 @@ export function ChatScreen({ friendId, navigate }: { friendId?: string; navigate
             ) : null;
           })}
         <Txt muted style={{ fontSize: 11, lineHeight: 18 }}>
-          Demo conversations live on this device. New messages aren’t delivered to another person.
+          {state.dataMode === 'cloud'
+            ? 'Conversations are shared only with their members.'
+            : 'Demo conversations live on this device. New messages aren’t delivered to another person.'}
         </Txt>
       </Sheet>
     );
@@ -140,7 +151,14 @@ export function ChatScreen({ friendId, navigate }: { friendId?: string; navigate
     >
       <ScrollView
         ref={scroll}
-        onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}
+        onContentSizeChange={() => {
+          const lastId = messages.at(-1)?.id;
+          if (lastId !== lastScrolledMessage.current) {
+            lastScrolledMessage.current = lastId;
+            scroll.current?.scrollToEnd({ animated: true });
+          }
+        }}
+        maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
         contentContainerStyle={{ padding: 24, gap: 18 }}
         keyboardShouldPersistTaps="handled"
       >
@@ -154,6 +172,7 @@ export function ChatScreen({ friendId, navigate }: { friendId?: string; navigate
             body="A simple hello is a pretty good start."
           />
         )}
+        <OlderMessages conversationId={conversation?.id} />
         {messages.map((m) => {
           const own = m.senderId === state.currentUserId;
           return (
@@ -172,13 +191,15 @@ export function ChatScreen({ friendId, navigate }: { friendId?: string; navigate
               </View>
               <Txt muted style={{ fontSize: 10 }}>
                 {timeLabel(m.createdAt)}
-                {own ? ' · Saved locally' : ''}
+                {own ? (state.dataMode === 'cloud' ? ' · Sent' : ' · Saved locally') : ''}
               </Txt>
             </View>
           );
         })}
         <Txt muted style={{ fontSize: 10, textAlign: 'center', marginTop: 8 }}>
-          Demo chat · live typing will arrive with realtime messaging
+          {state.dataMode === 'cloud'
+            ? 'Messages are saved online.'
+            : 'Demo chat · live typing will arrive with realtime messaging'}
         </Txt>
       </ScrollView>
     </Sheet>

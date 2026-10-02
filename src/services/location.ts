@@ -13,7 +13,9 @@ export interface LocationService {
 }
 export const deviceLocation: LocationService = {
   async requestPermission() {
-    const permission = await ExpoLocation.requestForegroundPermissionsAsync();
+    let permission = await ExpoLocation.getForegroundPermissionsAsync();
+    if (permission.status !== 'granted' && permission.canAskAgain)
+      permission = await ExpoLocation.requestForegroundPermissionsAsync();
     if (permission.status !== 'granted')
       throw new Error('Location is off. You can still explore and choose meetup spots.');
     return permission.ios?.accuracy ?? 'unknown';

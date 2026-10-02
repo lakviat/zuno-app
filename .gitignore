@@ -11,6 +11,15 @@ npm-debug.log*
 test-results/
 playwright-report/
 .DS_Store
+.idea/
+
+# Local owner/account dashboard evidence; keep out of the public source repository.
+/docs/screenshots/apple-membership-pending.png
+/docs/screenshots/app-store-connect-unavailable.png
+/docs/screenshots/xcode-personal-team-only.png
+/docs/screenshots/supabase-*.png
+/docs/screenshots/supabase-*.jpg
+/docs/screenshots/ios-account-connected.png
 
 # Expo
 .expo/

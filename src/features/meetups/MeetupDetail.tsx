@@ -28,8 +28,8 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
   const action = m && participationAction(state, meetupViewerId, m, now);
   const host = m && state.people.find((p) => p.user.id === m.hostId);
   const canManage = !!m && canManageMeetup(m, meetupViewerId, now);
-  const perform = (operation: 'join' | 'leave' | 'cancel') => {
-    const result = runMeetup({ operation, id: meetupId });
+  const perform = async (operation: 'join' | 'leave' | 'cancel') => {
+    const result = await runMeetup({ operation, id: meetupId });
     if (!result.ok) {
       setError(result.error);
       return;
@@ -38,7 +38,9 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
     setConfirmCancel(false);
     notify(
       operation === 'join'
-        ? 'You’re in. Saved in this demo.'
+        ? state.dataMode === 'cloud'
+          ? 'You’re in. Your place is saved.'
+          : 'You’re in. Saved in this demo.'
         : operation === 'leave'
           ? 'You’ve left this meetup.'
           : 'Meetup cancelled. It stays in Joined.',
@@ -222,24 +224,31 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
             <Button
               kind="quiet"
               icon="flag"
-              onPress={() => {
-                dispatch({
+              onPress={async () => {
+                const saved = await dispatch({
                   type: 'report',
                   reporterId: meetupViewerId,
                   subjectId: m.id,
-                  reason: 'Meetup concern (demo)',
+                  reason: 'Meetup concern',
                   id: uid(),
                   now: new Date().toISOString(),
                 });
-                notify('Report saved locally only. No moderation service is connected.');
+                if (saved)
+                  notify(
+                    state.dataMode === 'cloud'
+                      ? 'Report saved for review.'
+                      : 'Report saved locally only. No moderation service is connected.',
+                  );
               }}
             >
-              Report meetup · local only
+              {state.dataMode === 'cloud' ? 'Report meetup' : 'Report meetup · local only'}
             </Button>
           )}
           <Txt muted style={{ fontSize: 11, lineHeight: 17 }}>
             Joining opens this meetup’s group chat. It never adds friends or shares your location.
-            Invitations and attendance stay on this device.
+            {state.dataMode === 'cloud'
+              ? 'Invitations and attendance are saved online.'
+              : 'Invitations and attendance stay on this device.'}
           </Txt>
         </>
       )}

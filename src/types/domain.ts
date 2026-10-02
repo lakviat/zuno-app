@@ -32,6 +32,8 @@ export interface TemporarySharing {
   expiresAt: string;
 }
 export interface LocationPrivacy {
+  showSpeed?: boolean;
+  showHeading?: boolean;
   mode: LocationPrecision;
   ghostMode: boolean;
   temporary?: TemporarySharing;
@@ -129,6 +131,7 @@ export interface DiscoveryPreferences {
   units?: 'mph' | 'kmh';
 }
 export interface AppSnapshot {
+  dataMode?: 'cloud';
   version: 2;
   edgeZoomHintSeen?: boolean;
   currentUserId: ID;

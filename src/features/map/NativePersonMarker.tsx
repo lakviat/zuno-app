@@ -18,10 +18,7 @@ export const NativePersonMarker = memo(function NativePersonMarker({
   selected: boolean;
   onSelect(id: string): void;
 }) {
-  const sample = useMotion(
-    person.user.id,
-    person.mapAudience !== 'public' && person.location?.precision === 'precise',
-  );
+  const sample = useMotion(person.user.id, person.location?.precision === 'precise');
   const reduced = useReducedMotion();
   const origin = person.location!.coordinate;
   const initial = useRef(origin);

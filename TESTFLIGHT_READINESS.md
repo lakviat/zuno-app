@@ -1,132 +1,80 @@
 # Zuno — TestFlight readiness
 
-Audit date: October 1, 2026. Native scope: iOS. No Apple login, signing credential access, upload, paid service, or external publication was performed.
+Updated October 1, 2026, for the requested **real multiuser backend** beta. Earlier local-preview findings are preserved in [the historical audit](docs/TESTFLIGHT_AUDIT_2026-10-01.md).
 
 ## Current Status
 
-**READY FOR SIGNING** for an explicitly labeled, local-data preview beta. This is engineering readiness, not App Review approval or readiness for a public, live social service.
+**READY FOR SIGNING** for engineering preparation. The unsigned Release archive passes and the hosted social/onboarding schema is deployed and verified. This is not certification of a fully accepted hosted beta: Apple/Google provider configuration, hosted email delivery, legal URLs and physical iPhone acceptance remain before distribution.
 
-An **unsigned arm64 iPhone Release archive passed**. Apple enrollment, team selection, signing, App Store Connect configuration and upload remain. Real accounts, remote messages, realtime friend locations and moderation are not implemented. Missing backend configuration does not block this local beta.
+For the current authorized distribution attempt, the owner refreshed Xcode sign-in. Xcode exposes only Personal Team, Developer enrollment is Pending, and App Store Connect says the account is not enabled. No signing certificates, upload, publication, external Git push or paid service was performed. See [current distribution status](docs/TESTFLIGHT_DISTRIBUTION.md). See [authentication architecture](AUTH_ONBOARDING_ARCHITECTURE.md) and [hosted validation](docs/HOSTED_BACKEND_VALIDATION.md).
 
 ## Project
 
-| Item                                        | Audited configuration                                                                                                            |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Source of truth                             | Expo continuous native generation: `app.config.ts`, `plugins/`, npm lockfile and `native/ios/Podfile.lock`                       |
-| Application target / product / display name | `Zuno` / `Zuno.app` / Zuno                                                                                                       |
-| Scheme                                      | Shared `Zuno`; Run = Debug, Profile/Archive = Release                                                                            |
-| Configurations                              | Debug and Release; one app target, no extensions or native XCTest target                                                         |
-| Workspace                                   | Generated `ios/Zuno.xcworkspace`; use the workspace, not the `.xcodeproj`, because CocoaPods supplies native dependencies        |
-| Deployment target                           | iOS 16.4                                                                                                                         |
-| Devices                                     | iPhone and iPad (`TARGETED_DEVICE_FAMILY = 1,2`), arm64 devices; simulator is a separate build                                   |
-| Orientation                                 | Portrait and landscape; iPad full-screen-only is not required; one UIWindowScene                                                 |
-| Bundle identifier                           | `app.zuno.mobile` — preserved, syntactically valid; ownership/availability must be confirmed with your Team                      |
-| Marketing version                           | `0.1.0`, sourced from `package.json`                                                                                             |
-| Build number                                | `1`, explicitly set by `ios.buildNumber` in `app.config.ts`                                                                      |
-| Swift                                       | Swift language mode 5.0; installed Xcode 27.0 (27A266a), iOS SDK 27.0                                                            |
-| JavaScript/runtime                          | Expo 57.0.26, React Native 0.86.3, Hermes; bundled JS in Release, no Metro dependency                                            |
-| Dependency managers                         | npm (`package-lock.json`) and CocoaPods 1.16.2; no application Swift Package dependencies                                        |
-| CI                                          | No repository CI workflow or Fastlane setup. EAS profiles are prepared but no EAS account/project/service was created or invoked |
+| Item                                         | Value                                                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Application target / shared scheme / product | Zuno / Zuno / Zuno.app                                                                           |
+| Display name                                 | Zuno                                                                                             |
+| Workspace                                    | Generated CocoaPods `Zuno.xcworkspace`; not the stale ignored repository `ios/` copy             |
+| Prepared workspace                           | `/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/source/ios/Zuno.xcworkspace` |
+| Configurations                               | Debug and Release; Archive uses Release                                                          |
+| Deployment target / devices                  | iOS 16.4; iPhone and iPad; arm64 device                                                          |
+| Bundle ID                                    | `app.zuno.mobile`, preserved; ownership/availability still requires the user's Team              |
+| Marketing version                            | 0.1.0 from package.json                                                                          |
+| Build number                                 | 2 from app.config.ts `ios.buildNumber`                                                           |
+| Native/runtime                               | Xcode 27 / iOS 27 SDK; Swift 5 language mode; Expo 57.0.26 / RN 0.86.3 / Hermes                  |
+| Dependency managers / CI                     | npm and CocoaPods; no application SPM, Fastlane or CI workflow; EAS profiles unused              |
+| Signing                                      | Automatic signing prepared; no Team or certificate/profile hard-coded                            |
 
-### Prepared workspace and reproducible commands
-
-The working directory on Desktop is subject to iCloud/File Provider metadata. Previous framework signing problems there are avoided by staging native builds under `~/Library/Developer/Zuno/`.
-
-The prepared workspace on this Mac is:
-
-```text
-/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/source/ios/Zuno.xcworkspace
-```
-
-From the repository, using Node 22.13+ (validated with 22.23.1), installed Xcode and CocoaPods:
-
-```sh
-npm ci
-npm run ios:prepare
-npm run ios:archive:unsigned
-```
-
-The first command is for a fresh checkout; dependencies are already installed on this Mac. `ios:prepare` synchronizes source into a marked staging directory, regenerates native configuration and installs pods with `--deployment`. The archive command also builds for `generic/platform=iOS` with signing disabled and verifies the resulting app. It never logs in, signs, exports an IPA, or uploads. It creates a new timestamped archive rather than replacing a previous archive. Logs and `latest-archive.txt` stay alongside the managed workspace.
-
-The repository's ignored `ios/` directory was an older generated project, with the legacy app-delegate template. **Do not archive that stale copy.** Use the prepared workspace above. Changes to generated native files are not durable; change Expo configuration/plugins and prepare again. Select your Team after the final prepare, or supply your Team ID through `ZUNO_APPLE_TEAM_ID` when preparing later.
-
-The script excludes private environment files and signing material from its staging copy and disables implicit dotenv loading. Backend keys are not needed. A future signing Team ID can be supplied as a shell environment variable; alternatively choose it directly in Xcode. `CODE_SIGNING_ALLOWED=NO` is only an unsigned command-line override, never a persistent project setting.
-
-### Versioning and identity
-
-- Before the next upload, change `ios.buildNumber` in `app.config.ts` from `'1'` to `'2'`, then `'3'`, etc. Every uploaded build must have a new build number. Run `npm run ios:prepare` again before archiving.
-- Change the marketing version only for a new version milestone. `npm version 0.1.1 --no-git-tag-version` updates `package.json` and `package-lock.json`; Expo and the Xcode build settings read that version.
-- EAS uses **local** versioning, without automatic increments. `testflight` is a store-distribution, device Release profile; `production` inherits it. The existing simulator `preview` profile remains separate. Local Xcode is the prepared path and requires no Expo paid service.
-- No replacement bundle ID is recommended without knowing your ownership. Keep `app.zuno.mobile` if available for your Team. Otherwise choose an identifier you control and update `ios.bundleIdentifier` in `app.config.ts`, regenerate, and register/select the same ID in Apple Developer and App Store Connect. The preview launcher reads the built identifier rather than hard-coding it. Android's package is separate and deferred.
-- A bundle-ID change creates a different installed app/container. There are no APNs, Associated Domains, OAuth callbacks or backend app registrations to migrate today. The custom `zuno` URL scheme exists, but there is no authentication deep-link flow.
+Before each new TestFlight upload increment `ios.buildNumber` in `app.config.ts`, then prepare and archive again. For a new marketing version use `npm version <version> --no-git-tag-version`. If the bundle ID must change, update `ios.bundleIdentifier`, regenerate, and use the identical ID in Developer/App Store Connect. Recheck app container/Keychain and deep-link behavior; `zuno://auth/callback` remains the configured scheme callback.
 
 ## Build Results
 
-| Validation                                        | Result                                                                                            |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Debug simulator build                             | **PASS**, iPhone 17 / iOS 27 simulator target                                                     |
-| Release iPhone device build                       | **PASS**, included in the unsigned archive                                                        |
-| Release simulator build/startup                   | **PASS**, built/installed and startup checked on iPhone 17 / iOS 27 and iPhone SE / iOS 18.2      |
-| Archive validation                                | **PASS**, unsigned generic-iOS arm64 `.xcarchive`                                                 |
-| Signed archive / export / Apple server validation | Not attempted: no Team, distribution signing/provisioning or App Store Connect account configured |
+| Check                                     | Result                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------ |
+| Debug simulator                           | Prior baseline PASS; not repeated for this backend milestone                   |
+| Release generic iPhone / unsigned archive | PASS; verified final arm64 device archive                                      |
+| Release simulator                         | PASS; final build installed/launched on iPhone 17 / iOS 27                     |
+| Signed archive / Apple validation         | BLOCKED by absent Developer Team, signing and App Store Connect; not attempted |
 
-Validated unsigned archive:
+Final verified artifact:
 
-```text
-/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/Zuno-unsigned-20261001T205301837Z.xcarchive
-```
+`/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/Zuno-unsigned-build2-xcode-environment.xcarchive`
 
-The archive identifies `app.zuno.mobile`, version `0.1.0`, build `1`, minimum iOS `16.4`, device platform `iphoneos`, architecture `arm64`. Its Team and SigningIdentity fields are empty, as intended. It cannot be uploaded or installed on a phone until it is signed; re-archive normally after Team selection.
+Final simulator product:
 
-Release uses Swift `-O`, dSYM generation, `ENABLE_TESTABILITY=NO`, `ONLY_ACTIVE_ARCH=NO`, `SKIP_INSTALL=NO`, `VALIDATE_PRODUCT=YES`, and automatic signing. No user Team or specific certificate/profile is hard-coded. Debug keeps its normal unoptimized/testable configuration. No obsolete architecture exclusion, bitcode dependency, simulator-only framework slice, SPM failure or framework embedding error was found. Every embedded device framework contains arm64. The main executable's UUID matches `Zuno.app.dSYM`.
+`/var/folders/j3/p_5qjxb96nd193wxm0fwb2th0000gn/T/zuno-ios-60d5288d0b/DerivedData/Build/Products/Release-iphonesimulator/Zuno.app`
 
-`scripts/verify-ios-release.mjs` checks platform/architecture, identity/version, permission strings, ATS, scene configuration, icons, launch resource, embedded JavaScript, absence of developer-only UI strings, required-reason categories and included privacy manifests. It works on a built `.app` or `.xcarchive`.
+Final Release simulator installed and launched on iPhone 17 / iOS 27: native welcome renders with the existing logo and Apple/Google/Email actions; email form and keyboard remain usable, invalid email leaves Send disabled, and Back returns to welcome. No map flashes while signed out. That earlier visual smoke did not send email or grant location. The current distribution attempt sent one real owner email request, with delivery/callback still pending. Screenshot evidence: docs/screenshots/ios-auth-welcome.png and ios-auth-email-keyboard.png. Generated entitlements contain Sign in with Apple only; no APNs or background mode.
 
-### Warnings reviewed
+Commands (Node 22.13+, Xcode, CocoaPods): `npm run ios:prepare`, `npm run ios:archive:unsigned`, `npm run ios:preview`. Signed device/archive commands and exact account blockers are in [distribution status](docs/TESTFLIGHT_DISTRIBUTION.md). Staging outside Desktop avoids File Provider framework signing metadata. Native scripts exclude environment/signing files, pass only validated public backend configuration and install locked pods. Unsigned signing overrides are command-line-only. Do not reuse an unsigned archive for upload: create a normal signed archive after Team selection.
 
-The archive completed without application compiler/linker errors. Remaining warnings are upstream React Native Maps/SVG Objective-C deprecations and C++ diagnostics, Hermes diagnostics about runtime-provided JS globals/Expo compatibility code, SDK script phases without output declarations, and skipped App Intents metadata because the app has no App Intents. These were not hidden with warning-suppression flags.
+Release verification checks arm64, minimum OS, identity/version, strict ATS, scene/URL callback, bundled JS/public configuration, usage descriptions, icons/launch resources, absent developer UI and privacy manifests. Release uses Swift -O, dSYMs, ENABLE_TESTABILITY=NO, ONLY_ACTIVE_ARCH=NO and SKIP_INSTALL=NO. No device compiler/linker errors or broken embedded framework slices were found.
 
-The prebuilt SDK artifacts do not supply dSYMs for `React.framework`, `ReactNativeDependencies.framework` and `hermesvm.framework`; Zuno and the embedded Expo frameworks do have dSYMs. Apple may warn about missing vendor symbols during upload, limiting symbolication inside those SDKs. No fake/empty dSYMs were generated. This does not prevent local archiving; Apple-side validation remains untested. Retain the archive and logs and review any upload warnings.
+Upstream RN Maps/SVG deprecations, SDK script output warnings and skipped App Intents extraction remain. Prebuilt React/ReactNativeDependencies/Hermes lack some vendor dSYMs; app symbols exist. Apple may warn on upload and vendor-frame symbolication may be limited. No fake dSYMs or warning suppression was added.
 
 ## Tests
 
-| Check                           | Final result                                             |
-| ------------------------------- | -------------------------------------------------------- |
-| Strict TypeScript               | PASS                                                     |
-| ESLint                          | PASS, zero warnings after cleanup                        |
-| Prettier                        | PASS                                                     |
-| Vitest                          | **69 passed across 13 files**; none skipped              |
-| Playwright                      | **10 passed** on a complete rerun; none skipped          |
-| Expo dependency compatibility   | PASS, `expo install --check`                             |
-| Complete npm dependency graph   | PASS, no missing/invalid/conflicting dependency problems |
-| Production iOS JS/Hermes export | PASS, including source-map inspection                    |
-| CocoaPods locked install        | PASS, `pod install --deployment`                         |
-| Native archive checks           | PASS                                                     |
+- **136 tests across 20 files PASS:** existing domain/zoom/location behavior, Auth config/callback/Keychain, account SQL/RLS, social PostgreSQL/PostGIS policies/commands and cloud transport lifecycle/account isolation.
+- **11 real local Supabase integration checks PASS:** three authenticated accounts; actual Realtime inbox denial/delivery; private/friends/public; 25 mph from m/s; block while connected; coarse projection; stop/reconnect; persistent/idempotent private chat; concurrent final meetup seat and leave revocation; private Storage ownership; anonymous/raw-GPS denial. Final invalidation-only transport was retested. Zero disposable accounts remain. Cron is active.
+- **11 browser journeys PASS across the full run and isolated rerun:** 10 passed together; drag-reversal timed out during concurrent native builds, then passed unchanged in 34.2 seconds after builds finished. No assertions or timeouts were weakened. These use Development-only local preview, not hosted authentication.
+- **67 hosted SQL/RLS assertions PASS:** 49 social + 18 onboarding, synthetic identities fully rolled back. Final schema comparison: 282 audited objects with zero differences. Real hosted email/OAuth/WebSocket/device acceptance remains separate.
 
-The first browser run passed nine tests; its repeated-drag test exceeded the existing 45-second timeout while native compilation/export was running. The unchanged full suite passed when run without that load (including the drag test in 23.5 seconds). No test expectations or timeouts were weakened.
-
-Native Release smoke checks verified the map and local-preview label, absence of the developer viewer switch, denied-location feedback without a crash, a synthetic simulator GPS fix with honest unavailable-speed output, and background/foreground recovery after permission revocation. Simulated location was cleared and the app’s test permission reset afterward. This validates the flow, not physical GPS quality. Both the current archive and simulator bundles pass the artifact verifier.
-
-New tests exercise denied location permission, reduced accuracy without an unnecessary watcher, permission revocation between foreground sessions, and native sample/error forwarding with compatible requested accuracy. Existing tests cover privacy, blocks, persistence/migration, meetup capacity/audiences, chat access, map discovery and edge zoom.
-
-There is no native XCTest target: the generated scheme's stale `ZunoTests` reference was removed. Native validation uses real native builds plus simulator interaction. No connected physical iPhone was used, and no physical GPS, energy-use or frame-rate claim is made.
+- TypeScript, ESLint and Expo dependency compatibility PASS. Prettier and `git diff --check` PASS. Final source and generated archive include the modern photo-picker fix.
+- Not executed: hosted authenticated multiuser round trip, real magic-link delivery/cold callback, physical iPhone GPS/heading/speed/power, real selected-photo upload on device, Apple server validation. These remain acceptance checks and must not be represented as automated passes.
 
 ## Changes Made
 
-1. Centralized marketing version, explicit iOS build number, local EAS versioning and a device TestFlight profile; preserved the bundle ID and display name.
-2. Added a reproducible distribution configuration plugin: matching Xcode versions, automatic signing without a Team/certificate, explicit Release optimization/symbols, removal of the nonexistent XCTest reference and disabled network inspector.
-3. Removed unused Always Location and Motion permission strings; clarified the foreground location purpose. No background capability was enabled.
-4. Made distribution ATS reject arbitrary/local-network exceptions; native Metro networking requires the explicit development build channel.
-5. Added source-controlled required-reason declarations from installed SDKs; included the map SDK's otherwise omitted privacy manifest verbatim.
-6. Repaired the launch screen's missing image using Zuno's existing artwork. The generated 1024-pixel app icon is opaque and compiles successfully.
-7. Added an isolated, unsigned device archive workflow, locked CocoaPods install, and artifact verification. Preview launching now reads the built bundle ID.
-8. Clearly labeled the local sample world, hid the developer actor switch in Release, and verified fake-movement controls are inactive in Release.
-9. Corrected foreground GPS requested accuracy to match the existing sample filter, surfaced reduced-accuracy status, avoided watching for unusable reduced-accuracy fixes, rechecked permission on foreground return, and made recenter use a recent available device sample.
-10. Added location regression tests, documentation, and ignore rules for archives, IPA, dSYM, results and signing artifacts. Preserved the user's untracked `.idea/` folder.
+1. Extended the existing Auth/profile foundation with six reproducible migrations for the social graph, privacy, PostGIS latest location, bounded private realtime inboxes, atomic social commands, chat/meetup reads, private avatars and expiry cleanup.
+2. Connected existing map/people/profile/privacy/chat/meetup screens to authenticated commands and authoritative snapshots; configured builds use real UUIDs and no sample-world fallback. Kept native map/edge zoom/globe behavior.
+3. Added consent-gated foreground location publishing, separate durable/ephemeral cadence, permission/lifecycle/session guards, authorized motion projection and stale expiry. Broker notices contain no GPS or chat body.
+4. Added private avatar selection/upload, owner cleanup on account deletion, and relevant iOS privacy declarations. Modern iOS photo selection uses PHPicker without broad library/camera/microphone access.
+5. Added older-chat pagination, truthful async save errors, duplicate-send guards, cloud discovery and inaccessible-profile handling. Initial connection retries recover after transient startup failure.
+6. Added event-only development diagnostics without coordinates, tokens, user identifiers or raw server error logging; production diagnostics remain off. Added disposable local-stack tests and isolated browser-test environment.
+7. Updated deployment, architecture and readiness documentation and preserved older audit/preview evidence. `.idea/` and unrelated user work remain untouched.
 
 ## Dependencies
 
-No dependency versions were upgraded, replaced or removed. All direct runtime dependencies have a current use; browser-specific packages are required by the existing web preview and are absent from the iOS module graph. The complete npm graph resolves, and the Expo version compatibility check passes.
+Supabase JS 2.117.2, Expo SecureStore 57.0.4, Expo Crypto 57.0.3 and URL polyfill 4 provide the account foundation. Added Expo ImagePicker 57.0.20 (native ImageLoader 57.0.1) for implemented avatar selection. PGlite 0.5.8 and PGlite PostGIS 0.2.8 are development-only database tests. No broad dependency upgrade was performed. npm lock and reviewed CocoaPods lock resolve; Expo compatibility passes. Existing native dependency floors are compatible with iOS 16.4. Web-only/test/compiler packages do not belong in the native app module graph.
 
 | Direct runtime dependency                   | Installed | Use / deployment compatibility                                                               |
 | ------------------------------------------- | --------- | -------------------------------------------------------------------------------------------- |
@@ -139,6 +87,10 @@ No dependency versions were upgraded, replaced or removed. All direct runtime de
 | `expo-font`                                 | 57.0.4    | Bundled font loading; minimum iOS 16.4                                                       |
 | `expo-location`                             | 57.0.20   | Foreground permission and location watch; minimum iOS 16.4                                   |
 | `expo-status-bar`                           | 57.0.1    | Status-bar appearance                                                                        |
+| `expo-apple-authentication`                 | 57.0.2    | Native Apple sign-in; iOS deployment supported                                               |
+| `expo-web-browser`                          | 57.0.3    | Google authentication session; native redirect                                               |
+| `expo-image-manipulator`                    | 57.0.20   | Avatar resize/compression; selected image only                                               |
+| `expo-notifications`                        | 57.0.21   | Optional permission/status implementation; push gated, no APNs capability                    |
 | `maplibre-gl`                               | 6.11.2    | Web map only; excluded from iOS bundle                                                       |
 | `react`                                     | 19.2.3    | UI runtime, matching installed Expo/RN compatibility                                         |
 | `react-dom`                                 | 19.2.3    | Web only; excluded from iOS bundle                                                           |
@@ -148,153 +100,102 @@ No dependency versions were upgraded, replaced or removed. All direct runtime de
 | `react-native-svg`                          | 15.15.4   | Existing brand/artwork; minimum iOS 12.4                                                     |
 | `react-native-web`                          | 0.21.3    | Web only; excluded from iOS bundle                                                           |
 
-Development dependencies resolve and are not shipped as test/build tooling: `@playwright/test` 1.63.0, `@types/react` 19.2.18, `eslint` 9.39.5, `eslint-config-expo` 57.0.2, `prettier` 3.9.9, `typescript` 6.0.3 and `vitest` 5.0.3. Production source-map inspection confirms no Playwright, Vitest, ESLint, TypeScript compiler, MapLibre, React DOM or React Native Web modules. Expo's small Metro module-loader runtime appears under an `@expo/cli` source path; it is required runtime code, not the CLI. The vulnerable build-tool UUID package is absent; Expo's separate UUID utility is unrelated.
-
-The 92 resolved native podspecs include React/Hermes and Expo's transitive modules: Constants 57.0.20, Asset 57.0.18, FileSystem 57.0.7, DomWebView 57.0.1, KeepAwake 57.0.2, LogBox 57.0.4, ModulesCore 57.0.20, ModulesJSI 57.1.1, ModulesWorklets 57.0.20 and Hermes 250829098.0.17. Their iOS floors are compatible. React/Expo framework runtime support is retained; developer UI/keep-awake activation is gated. There is no `expo-dev-client` or Expo Go developer-menu dependency in the standalone app.
-
-The locked install initially detected exactly one checksum change: disabling the network inspector changes ExpoModulesCore's evaluated podspec. The refreshed lock was reviewed, with no package/version changes, and then passed `--deployment`. Keep `native/ios/Podfile.lock` with npm's lockfile; after an intentional native dependency/configuration change, review and copy the regenerated lock back rather than bypassing deployment validation.
-
-`npm audit` reports **11 moderate, zero high/critical** entries, all propagated through Expo's build-time Xcode/old UUID dependency chain. Its suggested broad fix downgrades Expo to SDK 46 and is inappropriate here. No forced upgrade/downgrade was applied. Re-audit when updating Expo; the vulnerable UUID module is not in the inspected iOS production graph.
+The latest npm audit reports **13 findings: 8 moderate, 5 high**, propagated through Expo/Xcode build-tool dependencies including node-forge and old UUID. No forced downgrade to an obsolete Expo SDK was applied. These are tooling-graph findings, not a claim of a demonstrated native runtime exploit; track upstream fixes and re-audit on the next compatible SDK update. The earlier audit's lower counts are historical.
 
 ## Permissions
 
-| Resource                                                                 | Actual behavior                                                                                                                                                                                                         |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Location, When Using the App                                             | Requested only after the user taps **Use location while here** in Location & privacy, following an explanation. Shows position/movement and nearby distances on this device. Uses `NSLocationWhenInUseUsageDescription` |
-| Always/background location                                               | Not requested, not configured; obsolete usage strings removed                                                                                                                                                           |
-| Motion/Fitness                                                           | Not requested. Speed and course come from Core Location samples, not Core Motion; obsolete motion string removed                                                                                                        |
-| Camera, Photos, Microphone, Contacts, Bluetooth, Local Network, Calendar | No app access/request; no permission descriptions required                                                                                                                                                              |
-| Notifications                                                            | No OS notification request, local scheduling or push registration. Existing notification objects are local UI data only                                                                                                 |
-| App Tracking Transparency                                                | No advertising/tracking implementation or request                                                                                                                                                                       |
+| Resource                                                       | Current request and reason                                                                                                                                          |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Foreground location                                            | Explicit When Using request to show position/nearby activity and share only with the chosen audience; denied/reduced accuracy remains usable for manual map/meetups |
+| Selected photo                                                 | User-initiated system PHPicker for an avatar; access only to the selected image; no broad photo-library usage string needed by this path                            |
+| Camera / microphone / Contacts / Bluetooth / Motion / Calendar | Not used or requested                                                                                                                                               |
+| Notifications                                                  | Permission/status UI prepared, native prompt gated until push delivery exists; no token registration or APNs entitlement                                            |
+| Background location / Always location                          | Not requested or enabled                                                                                                                                            |
+| Local Network                                                  | Development Metro only; no production usage string/exception                                                                                                        |
+| Tracking                                                       | No tracking/advertising SDK or ATT request                                                                                                                          |
 
-The sole shipped usage-description string is:
-
-> Zuno uses your location while the app is open to show your position, movement and nearby distances. This preview keeps your location on this device.
-
-Browsing, manual meetup placement, profile editing and local messaging work without granting location. No automatic prompt occurs at startup.
+Location usage text: “Zuno uses your location while open to show nearby people and meetups. If you enable sharing, your chosen audience can see your location and optional speed and heading.” Permission is not requested at launch. GPS course over ground is used when valid; no magnetic compass/geofence/significant-change service. Invalid speed/course is not fabricated. Reduced Accuracy pauses precise movement sharing. Backgrounding stops the watcher/publication; foreground rechecks permission. In-flight/queued location work is invalidated before stopping; offline last fixes expire in 90 seconds.
 
 ## Capabilities
 
-| Capability                                               | Current configuration / later portal work                                                                                                          |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Standard iOS app                                         | Empty application entitlements before signing; Apple will add application/team signing entitlements through provisioning                           |
-| Foreground Core Location                                 | Usage string and progressive request; no special Developer portal capability required                                                              |
-| MapKit display                                           | Apple Maps via react-native-maps; no Google key or special Maps routing entitlement needed. This is not an app registered as a directions provider |
-| Background Modes / location                              | Not enabled or needed by current behavior                                                                                                          |
-| Push Notifications / remote-notification mode            | Not enabled; no APNs setup needed for this beta                                                                                                    |
-| Sign in with Apple                                       | Not enabled; no real sign-in exists                                                                                                                |
-| Keychain Sharing, Associated Domains, App Groups, iCloud | Not enabled; no current feature needs them                                                                                                         |
-
-Do not add speculative capabilities. The only required account-side preparation today is the correct App ID, Team and normal App Store distribution signing/provisioning.
-
-## Location and runtime audit
-
-- Uses continuous **foreground** `watchPositionAsync` while explicitly enabled and active. No significant-change service, region monitoring, geofencing, background task or background location request exists.
-- Native course/heading and speed are read from location samples. This is course over ground, not a continuously running magnetic compass. Unknown/negative values and implausible readings are sanitized; stationary course is not presented as reliable.
-- Watch uses High (~10 m requested accuracy), distance filters of 35 m stationary, 10 m walking-speed and 15 m faster movement. Publication is separately gated at approximately 60/10/5 seconds. iOS controls the actual callback cadence; the supplied time interval is not an iOS guarantee. No navigation-grade highest-accuracy mode is enabled.
-- Rejects invalid coordinates, >65 m accuracy, stale/future/out-of-order and implausible jumps. Backgrounding and disabling stop watches and clear ephemeral samples; late async subscriptions are removed. Reduced Accuracy shows a useful explanation and avoids starting the precision watcher. Permission is rechecked without prompting after Settings/background transitions.
-- Recenter uses a valid recent device sample when present, otherwise returns to the labeled sample world. The app does not pretend sample Miami positions are live GPS. No raw device samples are persisted or transmitted by Zuno's repository/publisher.
-- Local publisher has no network adapter; ghost, blocks, explicit friend policy and approximate public policy are prepared but not server authorization. No sensitive sample is silently broadcast.
-- Offline map tiles may be unavailable; the UI has a loading/unavailable state and local social sheets remain available. Fonts/portraits/JS are bundled. Persistence read/write failures show local feedback, and the existing error boundary offers retry. Optional location failures do not gate startup. There is no absent backend or notification SDK initialization capable of blocking launch.
-- Source scan found no application localhost/LAN server, development REST/GraphQL URL, custom certificate, debug proxy, auth token, excessive app console logging or release-relevant TODO left active. Browser test URLs and native Debug Metro URLs are intentional tooling. Device Release loads its bundled JS.
-- Developer actor switching and simulated movement controls are `__DEV__` gated. The mock-movement module can remain in Metro's dependency/source-map graph, but its Release function immediately returns a no-op and cannot start a timer. It is not live tracking. The header labels sample people in every build; meetup/chat/privacy screens explain local-only behavior.
+Foreground Core Location and MapKit display need no extra portal capability. SecureStore uses the app's standard Keychain access; no Keychain Sharing group. Custom URL scheme `zuno` is configured. Sign in with Apple is now implemented and its entitlement is prepared; enable the capability for the owner App ID and regenerate provisioning. No Background Modes, APNs, Associated Domains, App Groups, iCloud or Maps routing-provider entitlement is enabled. Notification permission code is gated while push delivery is absent.
 
 ## Privacy
 
-The app's generated **PrivacyInfo.xcprivacy is present and parses successfully**. Its declarations are reproducible through `ios.privacyManifests` in `app.config.ts`, not an untracked manual Xcode edit. The archive verifier checks required-reason categories and SDK manifest presence.
+Generated `PrivacyInfo.xcprivacy` is valid and reproducible from app.config.ts. Required reasons remain SDK-derived: User Defaults CA92.1; File Timestamp C617.1 / 0A2A.1 / 3B52.1; Boot Time 35F9.1; Disk Space E174.1 / 85F4.1. Native SDK manifests, including the supplied RN Maps manifest, are bundled and checked.
 
-| Required-reason category | Reasons / installed provenance                                             |
-| ------------------------ | -------------------------------------------------------------------------- |
-| User Defaults            | `CA92.1` — React Native and Expo Constants                                 |
-| File Timestamp           | `C617.1` — React Native/AsyncStorage; `0A2A.1`, `3B52.1` — Expo FileSystem |
-| System Boot Time         | `35F9.1` — React Native timing/SDK elapsed-time support                    |
-| Disk Space               | `E174.1`, `85F4.1` — Expo FileSystem                                       |
+Connected builds now declare linked email, name, user ID, other user content, precise/coarse location and photos/videos for app functionality, with tracking false. This reflects actual Auth/social/GPS/avatar features and supersedes the previous local-only declaration. Owner must still review App Store privacy labels, provide a privacy policy/support contact, explain location expiry/backup limitations and moderation, and answer export compliance. `ITSAppUsesNonExemptEncryption` is intentionally unset pending that answer. No legal assertion is invented.
 
-These match the installed SDK authors' manifests/native API implementations; no reason was invented for a hypothetical feature. Expo FileSystem's prebuilt integration did not aggregate its reasons into the original root manifest, so they are explicitly retained at app level. The archive also includes Constants, AsyncStorage, React Core/cxxreact/timing, and ReactNativeDependencies boost/folly/glog privacy bundles.
-
-React Native Maps 1.27.2 supplies an Apple-map privacy file but does not reference it in its Apple Maps pod resources. The distribution plugin includes it verbatim as `ReactNativeMapsPrivacy.bundle/PrivacyInfo.xcprivacy`. It declares nontracking, unlinked precise-location use for app functionality. The Google Maps SDK/Google privacy bundle is not included on iOS.
-
-The app itself currently has no analytics, ad tracking, auth or social backend, and its application manifest has no collected-data entries. **This is not a prefilled App Store privacy-label answer.** Review Apple Maps/SDK data handling, the SDK precise-location declaration and the actual beta behavior before answering App Store Connect privacy questions. The owner must provide/approve privacy-policy and contact information. Revisit declarations before adding Supabase, analytics, remote location, uploads or moderation. Client-side local storage/processing must not be misrepresented as server-side collection or security enforcement.
-
-No custom/nonstandard encryption implementation was found; the visible networking uses platform HTTPS/MapKit. `ITSAppUsesNonExemptEncryption` remains unset so the owner answers Apple's export-compliance questionnaire rather than accepting an invented legal declaration. If the owner confirms the applicable exemption, the corresponding plist value can be set in `app.config.ts` later.
-
-References: [Apple required-reason APIs](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api), [Expo privacy manifests](https://docs.expo.dev/guides/apple-privacy/), [Apple app privacy definitions](https://developer.apple.com/app-store/app-privacy-details/), [export compliance](https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance/).
+No accumulating GPS-history table. The latest durable row is overwritten at most every 30 seconds; the faster cache is UNLOGGED, overwritten and expires after 90 seconds. Cron physically removes expired rows every five minutes. Broker messages contain only invalidations/removed IDs. Previously delivered data and still-valid avatar URLs cannot be retroactively erased; avatars expire after 60 seconds. Hosted retention/backups must be reflected in the owner's policy.
 
 ## Environment Variables / Secrets Needed Later
 
-Variable names only; none are required to run the local preview:
+Names only:
 
 ```text
+EXPO_PUBLIC_SUPABASE_URL
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ZUNO_APPLE_TEAM_ID
 ZUNO_BUILD_CHANNEL
-EXPO_PUBLIC_SUPABASE_URL
-EXPO_PUBLIC_SUPABASE_ANON_KEY
-GOOGLE_MAPS_ANDROID_API_KEY
 ```
 
-The Team variable is optional configuration, not a password. The build-channel variable selects native development networking; distribution preparation forces the TestFlight channel. Supabase variables are reserved, currently unused public client configuration; never substitute a service-role/secret key. The Google key is Android-only and not required for iOS. No analytics/APNs/private API credential is currently needed. Xcode can manage certificates/profiles after enrollment without putting private key contents in this repository.
+The two public Supabase values are already present in ignored local configuration and bundled intentionally. Never insert a service-role key, database password or SMTP secret into EXPO_PUBLIC values. SMTP belongs in Supabase's server settings. No analytics/APNs/private service credential is currently needed. Android's future key is out of this iOS scope. Release has no localhost/LAN API, broad ATS exception, Metro or dummy production endpoint.
 
-`.env.example` contains names/comments only. Real dotenv files, private keys, provisioning profiles, IPA and archive artifacts are ignored; the tracked-file credential-pattern scan found no matches. No credentials were printed, copied into the prepared workspace or committed. Backend integration later belongs behind `SocialRepository`, `AuthService` and `LocationPublisher`, not direct Supabase imports in UI. There is no live endpoint to configure today and no dummy production endpoint was introduced.
-
-Development uses Metro and can explicitly prepare with the development build channel for local-network ATS support. TestFlight/production uses Release JS, no Metro, strict ATS, no inspector/actor switch, and the deliberately labeled **local-preview** data adapter. No environment switch can pretend to enable a backend that has not been built.
+Additional optional public page configuration: `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_PRIVACY_URL`. Provider/server-only field names and owner setup steps are in AUTH_ONBOARDING_ARCHITECTURE.md.
 
 ## Assets
 
-The existing Zuno app icon generates a **1024 × 1024 opaque** universal iOS icon; asset compilation supplies the device icon representations. The source PNG has an alpha channel, but the generated AppIcon PNG has none. No missing/malformed app-icon entry was found. Existing fonts and fictional-person portraits are bundled; source attribution remains in `assets/SOURCES.md`.
-
-The bare launch storyboard referenced a nonexistent image. It now uses the existing `assets/splash-icon.png` through a generated `SplashScreen.imageset`. No new/fake branding was invented. Current assets are sufficient for the build. Final App Store marketing screenshots, public-store copy and owner's asset/privacy/legal review are later product work; no asset blocks signing this beta.
+Existing icon generates an opaque 1024px AppIcon and compiles; launch image is wired to existing Zuno artwork. Fonts are bundled. No fabricated final branding. Connected users start with a neutral avatar, not fictional demo portraits. Asset attribution and previous native validation are preserved. Final TestFlight/App Store screenshots and owner's rights/branding review remain product work; no known asset blocks compilation/signing.
 
 ## Apple Developer Steps Remaining
 
-1. Enroll in the Apple Developer Program and complete Apple's account/organization verification and agreements yourself. No Apple ID password should be pasted into code or chat.
-2. Confirm the intended Team and that `app.zuno.mobile` is available to it. Change the source configuration only if necessary. Decide whether the initial beta is the clearly labeled local preview described here.
-3. Run `npm run ios:prepare` for the final source/version. Open the prepared **Zuno.xcworkspace** listed above, select target Zuno → Signing & Capabilities → automatically manage signing → your Team. Alternatively provide your Team ID through the optional environment variable before preparation. Register the matching explicit App ID if Xcode does not do so. Do not enable extra capabilities.
-4. Allow Xcode to create/select the appropriate Apple signing certificate and provisioning profile. Protect the private key in your local Keychain. The project currently has no certificate/profile/team restriction.
-5. Create or connect the **iOS App Store Connect app record** using the exact bundle ID, Zuno display name if available, your primary language and a SKU you choose. Confirm account roles allow upload and testing.
-6. Complete required TestFlight beta description, feedback email/contact and testing information; review privacy-policy/contact details and export-compliance questions. For external testing, complete Beta App Review contact/review information and submit the beta for Apple's review. No sign-in credentials are required by this local-preview app.
-7. Connect your iPhone and validate the physical-device checklist below with a signed development build. This does not replace testing the eventual TestFlight build.
-8. Increment `ios.buildNumber` if this number has previously been uploaded. Prepare again **before** final Team selection if source/configuration changed. Confirm version/build in Xcode and ensure Archive uses Release.
-9. Select **Any iOS Device (arm64)** / generic iOS destination and Product → Archive. Do not reuse the unsigned archive for submission; create a normal signed archive. Do not carry over signing-disabled command-line flags.
-10. In Organizer, validate and choose Distribute App → App Store Connect → Upload. Keep symbols enabled; review any vendor-symbol or privacy warnings. Let Xcode perform App Store distribution signing/provisioning. Avoid changing version numbers only in Organizer if you want the repository to remain authoritative.
-11. Wait for Apple processing, resolve any validation/compliance questions, select the build under TestFlight and add an internal testing group with eligible App Store Connect users.
-12. Install through TestFlight and repeat launch/location/map/offline checks. Add external testers only after the required Beta App Review approval.
-
-[Apple distribution workflow](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases), [upload requirements](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/), [current SDK submission guidance](https://developer.apple.com/app-store/submitting/). Xcode 27/iOS 27 is a supported current SDK family; server-side account/build acceptance has not been attempted.
-
-### Prepared beta copy
-
-**Description:** Zuno is an early social-map preview. Explore a sample world, choose meetup spots directly on the map, create activities, try local conversations and availability, and optionally inspect your device's foreground location. People are fictional and social changes stay on this device. Real accounts and communication between phones are not available yet.
-
-**What to test:** Launch and map rendering; zoom from either screen edge out to the globe and back; meetup placement, times and capacity; keyboard/layout behavior; local chat/profile persistence; location denial and reduced accuracy; foreground GPS movement; background/foreground recovery; offline behavior. Please include your iPhone model, iOS version and steps when reporting a problem.
-
-Feedback email, owner/review contact, privacy URL and tester selection must be supplied by the owner. No contact identity was fabricated.
+1. Complete provider/SMTP configuration and hosted three-account acceptance in SUPABASE_SETUP.md; the database deployment is already verified.
+2. Enroll/sign in to Apple Developer yourself; complete agreements and select your Team. Never share an Apple ID password here.
+3. Confirm `app.zuno.mobile` belongs to/is available for that Team; register the explicit App ID if necessary. Enable only the capabilities listed above.
+4. Prepare final source/version, open the generated workspace, select target Zuno and automatic signing/Team. Allow Xcode to manage certificates/profiles in Keychain.
+5. Create/connect the App Store Connect iOS app record with that bundle ID, display name, primary language and a SKU you choose; verify upload/testing roles.
+6. Supply beta description, feedback/support/contact and privacy information, accurate App Store privacy and export-compliance answers, and reviewer sign-in instructions. Configure a working tester/reviewer email path; public email delivery is not assumed.
+7. Validate on signed physical iPhones with multiple accounts using the checklist below.
+8. Increment build number if previously uploaded, regenerate if needed, select generic iOS device and Archive with Release and normal signing (no CODE_SIGNING_ALLOWED=NO).
+9. Validate in Organizer, review symbols/privacy warnings, then Distribute → App Store Connect → Upload. The owner has now authorized TestFlight upload; public App Store submission remains prohibited.
+10. After processing/compliance, select the TestFlight build, add eligible internal testers and test the actual installed build. External testers require Beta App Review and working email onboarding.
 
 ## Physical iPhone Test Checklist
 
-- [ ] Fresh install and cold launch, then relaunch with saved data; no Metro/Expo Go dependency, developer gear or actor-switch menu.
-- [ ] Header clearly identifies the local sample world; fictional users are not mistaken for nearby real people.
-- [ ] App icon/launch artwork, light/dark appearance, portrait/landscape, safe areas, keyboard and larger text; also test an iPad if keeping iPad support.
-- [ ] Apple Maps loads over cellular/Wi-Fi; pan, pinch, both edge gestures, maximum globe zoom and quick direction reversals; return to nearby view.
-- [ ] Opening the app does not request location. Open Location & privacy, read the explanation and request When Using the App only.
-- [ ] Test Don't Allow, Allow Once, While Using, system Location Services off, and permission revoked in Settings; manual browsing/meetups continue.
-- [ ] Turn Precise Location off: explanation appears, no fabricated speed/course or endless precision watcher. Turn it on again, foreground the app or stop/start location, and recover.
-- [ ] Outdoors, enable location and tap recenter: it uses the phone's recent location rather than Miami. Move safely and verify position, speed units and course; stationary/unknown/poor GPS do not create false movement.
-- [ ] Background/lock/unlock repeatedly: foreground tracking stops in background and resumes only when enabled; inspect energy/battery behavior. There should be no request for Always Location or background-location indicator caused by Zuno.
-- [ ] Ghost/approximate/hidden controls remain independent of meetup attendance; current beta does not transmit samples or messages to another phone.
-- [ ] Create a pinned Now and future meetup, edit/cancel, exercise available join/leave flows, type/send a local message, and verify chat access/persistence. Non-friend actor switching is a development-only QA tool and absent from TestFlight.
-- [ ] Edit profile and theme; restart; local data persists. Reports explain local-only storage. Local data deletion requires confirmation and restores the sample world.
-- [ ] Airplane mode/network loss: app still launches, local sheets work, uncached map tiles may fail gracefully; reconnect and check recovery.
-- [ ] No sign-in or push notification permission is expected. If either appears unexpectedly, stop and report the build/version.
-- [ ] Use TestFlight feedback/crash reporting for crashes, hangs and layout failures; retain version/build, steps and device model. Physical frame rate, power use and GPS accuracy remain unverified until these tests are performed.
+- [ ] Cold launch/relaunch, no Metro/developer overlay; safe areas, keyboard, dynamic type, portrait/landscape, light/dark. Include iPad if retaining its support.
+- [ ] Map tiles, pan/pinch, both side zoom gestures, fast reversals, full globe and recenter on cellular/Wi-Fi.
+- [ ] Magic-link email and warm/cold callback on the initiating phone; session restoration, expiry, sign-out, account switch and no prior account's content.
+- [ ] Location denied/Allow Once/While Using, Location Services off, Precise Location off/on, permission revoked; manual map/meetups remain usable.
+- [ ] Safe outdoor movement with two phones: Public/Friends/Private, speed units, valid heading, stationary/poor GPS, stale/offline expiry, blocking an already-connected viewer.
+- [ ] Background/lock/unlock and logout stop sharing; reconnect reconstructs saved state. Verify energy use; no Always permission or background tracking.
+- [ ] Create/edit/cancel map meetups, invitations/audiences, concurrent capacity, join/leave and chat access; attendance never turns on GPS sharing.
+- [ ] Direct/group send, receipt, unread state, earlier history, reconnect/relaunch; unauthorized account denied.
+- [ ] Profile/name/username/avatar upload/replacement; camera/microphone not requested; cancel picker; oversized image/error handling.
+- [ ] Network/backend unavailable: no launch crash or false successful write; recovery works. Push permission is not expected.
+- [ ] Delete only a disposable test account after explicit confirmation; verify photos/profile/location/relations disappear.
+- [ ] Retain version/build/device/steps in TestFlight crash feedback; physical frame rate/GPS/power and Apple acceptance remain unverified.
 
 ## Remaining Blockers
 
-| Category                      | Remaining work                                                                                                                                                                                                                      |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CODE blockers**             | **NONE for signing the local-preview beta**. Native smoke checks are recorded above. No account error is being classified as a code failure                                                                                         |
-| **APPLE ACCOUNT blockers**    | Program enrollment/agreements; Team/App ID ownership; certificates and provisioning; App Store Connect app/roles; signing, server validation, processing and upload; TestFlight groups and external Beta App Review when applicable |
-| **PRODUCT DECISION blockers** | Confirm local-preview beta scope, bundle-ID availability/ownership, iPad scope, contact/privacy-policy information, tester audience, and owner's privacy/export-compliance answers. These are not invented in configuration         |
-| **BACKEND blockers**          | None for this local beta. Real multi-user testing requires auth, Supabase repository/subscriptions, server-side consent/RLS/capacity enforcement, remote chat and moderation; deliberately out of scope                             |
-| **ASSET blockers**            | None for native build/signing. Public-store marketing materials and final rights/branding review remain owner work                                                                                                                  |
+| Category         | Remaining work                                                                                                                                                                                                                                                         |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CODE             | No known compiler, unit-test or archive blocker. Physical-device and hosted acceptance remain unverified; do not equate local tests with a production-scale certification.                                                                                             |
+| APPLE ACCOUNT    | Enrollment/agreements, Team/App ID, signing/provisioning, App Store Connect record/metadata, signed archive/upload/processing/TestFlight groups.                                                                                                                       |
+| PRODUCT DECISION | Tester email delivery/audience; privacy/support/contact and moderation process; confirm foreground-only early beta limits, bundle ID ownership and iPad scope; export-compliance answers.                                                                              |
+| BACKEND          | Deployment complete; public channels disabled; 67 hosted assertions and 282-object catalog comparison passed. Remaining: Apple/Google provider configuration, SMTP for non-team addresses, real hosted email/WebSocket/Storage sessions with owner-controlled testers. |
+| ASSET            | No native-build blocker; final marketing screenshots and owner review remain.                                                                                                                                                                                          |
 
-Physical-device testing and Apple server acceptance cannot be certified by an unsigned archive or simulator. The next engineering stage is selecting the Team and completing signing, not rebuilding the app or starting a backend rewrite.
+Engineering preparation and hosted database deployment are complete. Remaining acceptance covers owner provider/SMTP configuration and real signed-iPhone testing, followed by TestFlight distribution. See SUPABASE_ARCHITECTURE.md for complete tables/RPCs/security and SUPABASE_SETUP.md for exact dashboard steps.
+
+## Authentication milestone changes
+
+- Added welcome/bootstrap routing; native Apple, Google PKCE and simple email entry; owner-only profile/location onboarding and resume state.
+- Deployed the unchanged six social migrations first, then `202610030001_onboarding.sql`; enabled private-only Realtime and verified all policies/grants against local Supabase.
+- Added explicit session-end cleanup, abortable RPCs, secure-storage logout revocation and avatar cache clearing. Harmless device preferences are separate.
+- Added bounded photo resize/compression, permission denial/Settings handling, optional notification strategy gated until actual push exists, and Development-only sample routing.
+- Added compatible Expo Apple/WebBrowser/ImageManipulator/Notifications dependencies and refreshed the CocoaPods lock. Added development-only React renderer tests. No major dependency upgrades or private credentials.
+- New audit SQL, screenshots, hosted validation report and AUTH_ONBOARDING_ARCHITECTURE.md describe the exact remaining owner steps.
+
+The complete authentication test matrix and provider configuration instructions are in AUTH_ONBOARDING_ARCHITECTURE.md. Apple provider tests use mocked native responses until a signed iPhone and configured provider are available. Google provider tests use mocked browser callbacks until owner OAuth setup. Do not label either as a real provider login pass.
+
+Native dependency note: Expo automatically adds a push entitlement when the Notifications package is present. The distribution plugin explicitly removes it while push delivery is unimplemented. Both final generated projects were checked: only `com.apple.developer.applesignin` remains. Expo dependency compatibility, TypeScript, ESLint, Prettier and Git whitespace checks pass. The local test stack was stopped with its data volumes preserved.

@@ -1,6 +1,19 @@
 import type { ExpoConfig } from 'expo/config';
 import { version } from './package.json';
 
+const backendUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
+const backendKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+const cloudAccounts = !!backendUrl && !!backendKey;
+if (
+  (backendUrl || backendKey) &&
+  (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(backendUrl ?? '') ||
+    !/^sb_publishable_[A-Za-z0-9_-]+$/.test(backendKey ?? ''))
+) {
+  throw new Error(
+    'Invalid public Supabase configuration. Supply the HTTPS Project URL and a publishable key; never a secret or service-role key.',
+  );
+}
+
 const config: ExpoConfig = {
   name: 'Zuno',
   slug: 'zuno',
@@ -11,8 +24,9 @@ const config: ExpoConfig = {
   icon: './assets/icon.png',
   ios: {
     supportsTablet: true,
+    usesAppleSignIn: true,
     bundleIdentifier: 'app.zuno.mobile',
-    buildNumber: '1',
+    buildNumber: '2',
     ...(process.env.ZUNO_APPLE_TEAM_ID ? { appleTeamId: process.env.ZUNO_APPLE_TEAM_ID } : {}),
     infoPlist: {
       EXDevMenuShowFloatingActionButton: false,
@@ -26,7 +40,24 @@ const config: ExpoConfig = {
     privacyManifests: {
       NSPrivacyTracking: false,
       NSPrivacyTrackingDomains: [],
-      NSPrivacyCollectedDataTypes: [],
+      NSPrivacyCollectedDataTypes: cloudAccounts
+        ? [
+            'NSPrivacyCollectedDataTypeEmailAddress',
+            'NSPrivacyCollectedDataTypeName',
+            'NSPrivacyCollectedDataTypeUserID',
+            'NSPrivacyCollectedDataTypeOtherUserContent',
+            'NSPrivacyCollectedDataTypePreciseLocation',
+            'NSPrivacyCollectedDataTypeCoarseLocation',
+            'NSPrivacyCollectedDataTypePhotosorVideos',
+          ].map((NSPrivacyCollectedDataType) => ({
+            NSPrivacyCollectedDataType,
+            NSPrivacyCollectedDataTypeLinked: true,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: [
+              'NSPrivacyCollectedDataTypePurposeAppFunctionality',
+            ],
+          }))
+        : [],
       NSPrivacyAccessedAPITypes: [
         {
           NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',
@@ -57,11 +88,18 @@ const config: ExpoConfig = {
   web: { favicon: './assets/favicon.png', name: 'Zuno — A little closer', bundler: 'metro' },
   plugins: [
     './plugins/with-ios-scenes',
+    'expo-apple-authentication',
+    'expo-web-browser',
+    [
+      'expo-image-picker',
+      { photosPermission: false, cameraPermission: false, microphonePermission: false },
+    ],
+    ['expo-secure-store', { configureAndroidBackup: true, faceIDPermission: false }],
     [
       'expo-location',
       {
         locationWhenInUsePermission:
-          'Zuno uses your location while the app is open to show your position, movement and nearby distances. This preview keeps your location on this device.',
+          'Zuno uses your location while open to show nearby people and meetups. If you enable sharing, your chosen audience can see your location and optional speed and heading.',
         locationAlwaysAndWhenInUsePermission: false,
         locationAlwaysPermission: false,
         motionUsagePermission: false,
@@ -78,6 +116,6 @@ const config: ExpoConfig = {
       : []),
     './plugins/with-ios-distribution',
   ],
-  extra: { zunoDataMode: 'local-preview' },
+  extra: { zunoDataMode: cloudAccounts ? 'supabase' : 'local-preview' },
 };
 export default config;

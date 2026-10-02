@@ -1,3 +1,4 @@
+import { OlderMessages } from './OlderMessages';
 import { useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Avatar, Button, EmptyState, Field, IconButton, Txt, ui } from '../../components/ui';
@@ -10,21 +11,29 @@ import { timeLabel, uid } from '../../utils/time';
 export function MeetupChat({ meetupId, navigate }: { meetupId: string; navigate: Navigate }) {
   const { state, now, meetupViewerId, colors, dispatch } = useApp();
   const [text, setText] = useState('');
+  const sending = useRef(false);
+  const lastScrolledMessage = useRef<string | undefined>(undefined);
   const scroll = useRef<ScrollView>(null);
   const m = getAuthorizedMeetup(state, meetupViewerId, meetupId);
   const allowed = canReadMeetupChat(state, meetupViewerId, meetupId);
   const writable = allowed && m && ['scheduled', 'active'].includes(meetupLifecycle(m, now));
-  const send = () => {
-    if (!writable || !text.trim()) return;
-    dispatch({
-      type: 'meetup-message',
-      actorId: meetupViewerId,
-      meetupId,
-      text,
-      id: uid(),
-      now: Date.now(),
-    });
-    setText('');
+  const send = async () => {
+    if (sending.current || !writable || !text.trim()) return;
+    sending.current = true;
+    const draft = text;
+    try {
+      const saved = await dispatch({
+        type: 'meetup-message',
+        actorId: meetupViewerId,
+        meetupId,
+        text,
+        id: uid(),
+        now: Date.now(),
+      });
+      if (saved) setText((current) => (current === draft ? '' : current));
+    } finally {
+      sending.current = false;
+    }
   };
   return (
     <Sheet
@@ -64,7 +73,14 @@ export function MeetupChat({ meetupId, navigate }: { meetupId: string; navigate:
           ref={scroll}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: 22, gap: 16 }}
-          onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}
+          onContentSizeChange={() => {
+            const lastId = meetupMessages(state, meetupViewerId, meetupId).at(-1)?.id;
+            if (lastId !== lastScrolledMessage.current) {
+              lastScrolledMessage.current = lastId;
+              scroll.current?.scrollToEnd({ animated: false });
+            }
+          }}
+          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
         >
           <Button
             kind="secondary"
@@ -74,8 +90,14 @@ export function MeetupChat({ meetupId, navigate }: { meetupId: string; navigate:
             Open meeting spot on map
           </Button>
           <Txt muted style={{ fontSize: 11 }}>
-            {m.participantIds.length} going · Messages stay in this local demo.
+            {m.participantIds.length} going ·{' '}
+            {state.dataMode === 'cloud'
+              ? 'Messages are shared with current members.'
+              : 'Messages stay in this local demo.'}
           </Txt>
+          <OlderMessages
+            conversationId={state.conversations.find((c) => c.meetupId === meetupId)?.id}
+          />
           {meetupMessages(state, meetupViewerId, meetupId).map((message) => {
             const own = message.senderId === meetupViewerId;
             const person = state.people.find((p) => p.user.id === message.senderId);

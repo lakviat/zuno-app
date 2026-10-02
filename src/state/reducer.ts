@@ -4,6 +4,15 @@ import type { AppSnapshot, LocationPrivacy, Message, Profile } from '../types/do
 import { isBlocked, isFriend } from '../utils/privacy';
 
 export type Action =
+  | {
+      type: 'sharing';
+      value: {
+        visibility: 'private' | 'friends' | 'public';
+        precision: 'precise' | 'approximate';
+        showSpeed: boolean;
+        showHeading: boolean;
+      };
+    }
   | { type: 'discovery'; value: Partial<AppSnapshot['discovery']> }
   | { type: 'availability'; value: 'free' | 'later' | 'busy'; intent: string; now: number }
   | {
@@ -39,6 +48,21 @@ export type Action =
 
 export function reducer(state: AppSnapshot, action: Action): AppSnapshot {
   switch (action.type) {
+    case 'sharing':
+      return {
+        ...state,
+        privacy: {
+          mode: action.value.visibility === 'private' ? 'hidden' : action.value.precision,
+          ghostMode: action.value.visibility === 'private',
+          showSpeed: action.value.showSpeed,
+          showHeading: action.value.showHeading,
+        },
+        discovery: {
+          ...state.discovery,
+          mode: action.value.visibility === 'private' ? 'hidden' : action.value.visibility,
+          optedIn: action.value.visibility === 'public',
+        },
+      };
     case 'discovery':
       return { ...state, discovery: { ...state.discovery, ...action.value } };
     case 'availability':

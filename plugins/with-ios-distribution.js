@@ -1,9 +1,20 @@
-const { withXcodeProject, withPodfileProperties, IOSConfig } = require('expo/config-plugins');
+const {
+  withXcodeProject,
+  withPodfileProperties,
+  withEntitlementsPlist,
+  IOSConfig,
+} = require('expo/config-plugins');
 const fs = require('node:fs');
 const path = require('node:path');
 
 /** Keep distribution fixes reproducible: ios/ is generated and is not the source of truth. */
 module.exports = function withIOSDistribution(config) {
+  // Expo auto-applies its notifications plugin. Permission/status UI does not need
+  // APNs; enable this entitlement only together with a real push sender/registry.
+  config = withEntitlementsPlist(config, (mod) => {
+    delete mod.modResults['aps-environment'];
+    return mod;
+  });
   config = withPodfileProperties(config, (mod) => {
     mod.modResults.EX_DEV_CLIENT_NETWORK_INSPECTOR = 'false';
     return mod;

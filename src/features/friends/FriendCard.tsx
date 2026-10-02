@@ -22,10 +22,7 @@ export function FriendCard({
   navigate: Navigate;
 }) {
   const { colors, state, now, dispatch } = useApp();
-  const sample = useMotion(
-    person.user.id,
-    person.mapAudience !== 'public' && person.location?.precision === 'precise',
-  );
+  const sample = useMotion(person.user.id, person.location?.precision === 'precise');
   const reduced = useReducedMotion();
   const [animation] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -82,7 +79,11 @@ export function FriendCard({
           {person.location?.place ?? 'Location is private'}
         </Txt>
         <Txt muted style={{ fontSize: 11 }}>
-          {person.mapAudience === 'public' ? '· Public · approximate' : '· Friend'}
+          {person.mapAudience === 'public'
+            ? person.location?.precision === 'approximate'
+              ? '· Public · approximate'
+              : '· Public'
+            : '· Friend'}
         </Txt>
       </View>
       {sample && (

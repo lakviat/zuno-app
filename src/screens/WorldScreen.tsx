@@ -23,17 +23,21 @@ import { MeetupsScreen } from '../features/meetups/MeetupsScreen';
 import { MeetupForm } from '../features/meetups/MeetupForm';
 import { demoAreas } from '../features/meetups/places';
 import { listVisibleMeetups } from '../features/meetups/domain';
+import { AccountScreen } from '../features/account/AccountScreen';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { PrivacyScreen } from '../features/privacy/PrivacyScreen';
 import { BottomNav, Header, MobilePeoplePill, WorldPanel } from './HomeChrome';
 import { SheetHost } from '../components/Sheet';
 import type { Route } from '../navigation/routes';
 import { tokens } from '../theme/tokens';
-import { motionStore } from '../features/location/store';
+import { motionStore, useMotion } from '../features/location/store';
 
 export function WorldScreen() {
   const {
     now,
+    cloud,
+    signedIn,
+    syncError,
     ready,
     friends,
     me,
@@ -47,7 +51,9 @@ export function WorldScreen() {
     meetupAreaId,
     setMeetupViewport,
   } = useApp();
-  const [route, setRoute] = useState<Route>({ name: 'map' });
+  const [route, setRoute] = useState<Route>(() =>
+    cloud && !signedIn ? { name: 'account' } : { name: 'map' },
+  );
   const [selected, setSelected] = useState<string>();
   const [placing, setPlacing] = useState<{ friendId?: string }>();
   const [moving, setMoving] = useState(false);
@@ -86,6 +92,10 @@ export function WorldScreen() {
   const navigate = useCallback(
     (next: Route) => {
       map.current?.endZoom();
+      if (cloud && !signedIn && next.name !== 'account' && next.name !== 'map') {
+        setRoute({ name: 'account' });
+        return;
+      }
       if (next.name === 'create-meetup' && next.friendId) setMeetupViewerId(state.currentUserId);
       if (next.name === 'create-meetup' && !next.place) {
         setSelected(undefined);
@@ -99,7 +109,7 @@ export function WorldScreen() {
       setPlacing(undefined);
       setRoute(next);
     },
-    [setMeetupViewerId, state.currentUserId],
+    [setMeetupViewerId, state.currentUserId, cloud, signedIn],
   );
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -129,10 +139,22 @@ export function WorldScreen() {
         : eligiblePeople.filter((f) => filter !== 'free' || isAvailable(f.presence, now)),
     [filter, personalView, eligiblePeople, now],
   );
-  const mapMe = useMemo(
-    () => (personalView ? me : { ...me, location: undefined }),
-    [personalView, me],
-  );
+  const ownFix = useMotion(state.currentUserId);
+  const mapMe = useMemo(() => {
+    if (!personalView) return { ...me, location: undefined };
+    if (!ownFix || now - ownFix.timestamp > 90000) return me;
+    return {
+      ...me,
+      location: {
+        userId: me.user.id,
+        coordinate: ownFix.coordinate,
+        accuracyMeters: ownFix.accuracy,
+        updatedAt: new Date(ownFix.timestamp).toISOString(),
+        place: 'Your location',
+        precision: 'precise' as const,
+      },
+    };
+  }, [personalView, me, ownFix, now]);
   const onMeetupPress = useCallback(
     (meetupId: string) => navigate({ name: 'meetups', meetupId }),
     [navigate],
@@ -300,7 +322,7 @@ export function WorldScreen() {
           />
           <IconButton
             name="navigation"
-            label="Recenter demo map"
+            label={cloud ? 'Recenter map' : 'Recenter demo map'}
             onPress={() => {
               const sample = motionStore.get(state.currentUserId);
               map.current?.recenter(
@@ -377,16 +399,23 @@ export function WorldScreen() {
             ...tokens.shadow,
           }}
         >
-          <Txt style={{ color: colors.surface, fontSize: 12 }}>{toast}</Txt>
+          <Txt style={{ color: colors.surface, fontSize: 12 }}>{toast || syncError}</Txt>
         </View>
       )}
       <SheetHost visible={route.name !== 'map'} onClose={() => navigate({ name: 'map' })}>
+        {route.name === 'account' && <AccountScreen navigate={navigate} />}
         {route.name === 'availability' && <AvailabilityScreen navigate={navigate} />}
         {route.name === 'meetup-chat' && (
-          <MeetupChat meetupId={route.meetupId} navigate={navigate} />
+          <MeetupChat key={route.meetupId} meetupId={route.meetupId} navigate={navigate} />
         )}
         {route.name === 'friends' && <FriendsScreen navigate={navigate} />}
-        {route.name === 'inbox' && <ChatScreen friendId={route.friendId} navigate={navigate} />}
+        {route.name === 'inbox' && (
+          <ChatScreen
+            key={route.friendId ?? 'inbox'}
+            friendId={route.friendId}
+            navigate={navigate}
+          />
+        )}
         {route.name === 'meetups' && (
           <MeetupsScreen
             meetupId={route.meetupId}

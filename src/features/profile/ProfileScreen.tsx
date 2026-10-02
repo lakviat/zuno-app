@@ -1,3 +1,4 @@
+import { AvatarUpload } from './AvatarUpload';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Avatar, Button, Chip, Field, Icon, Txt, ui } from '../../components/ui';
@@ -8,11 +9,12 @@ import { uid } from '../../utils/time';
 import type { Navigate } from '../../navigation/routes';
 
 export function ProfileScreen({ userId, navigate }: { userId?: string; navigate: Navigate }) {
-  const { now, state, me, friends, colors, dispatch, reset, notify } = useApp();
+  const { now, state, me, friends, colors, dispatch, reset, notify, cloud } = useApp();
   const person = state.people.find((p) => p.user.id === userId) ?? me;
   const own = person.user.id === state.currentUserId;
   const [edit, setEdit] = useState(false);
   const [name, setName] = useState(person.profile.displayName);
+  const [username, setUsername] = useState(person.profile.username);
   const [bio, setBio] = useState(person.profile.bio);
   const [status, setStatus] = useState(person.presence.status);
   const [confirm, setConfirm] = useState<'remove' | 'block' | 'reset' | 'report' | null>(null);
@@ -22,9 +24,20 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
   const pending = state.friendships.some(
     (f) => f.status === 'pending' && [f.addresseeId, f.requesterId].includes(person.user.id),
   );
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) return;
-    dispatch({ type: 'profile', value: { displayName: name.trim(), bio: bio.trim() }, status });
+    if (
+      !(await dispatch({
+        type: 'profile',
+        value: {
+          displayName: name.trim(),
+          bio: bio.trim(),
+          ...(cloud ? { username: username.toLowerCase().trim() } : {}),
+        },
+        status,
+      }))
+    )
+      return;
     setEdit(false);
     notify('Your profile feels a little more you.');
   };
@@ -37,21 +50,27 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
         notify('Could not reset local storage. Please try again.');
       }
     } else if (confirm === 'report') {
-      dispatch({
+      const saved = await dispatch({
         type: 'report',
         subjectId: person.user.id,
         reason: reason.trim(),
         id: uid(),
         now: new Date().toISOString(),
       });
-      notify('Report saved locally. This demo has no moderation delivery service.');
+      if (!saved) return;
+      notify(
+        cloud
+          ? 'Report saved for review.'
+          : 'Report saved locally. This demo has no moderation delivery service.',
+      );
     } else if (confirm) {
-      dispatch({
+      const saved = await dispatch({
         type: 'friend',
         id: person.user.id,
         operation: confirm,
         now: new Date().toISOString(),
       });
+      if (!saved) return;
       notify(
         confirm === 'block' ? 'Blocked and removed from your world.' : 'Removed from your friends.',
       );
@@ -59,6 +78,15 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
     }
     setConfirm(null);
   };
+  if (userId && userId !== state.currentUserId && !state.people.some((p) => p.user.id === userId)) {
+    return (
+      <Sheet title="Profile unavailable" onClose={() => navigate({ name: 'map' })}>
+        <Txt muted>
+          This profile is no longer available. Return to your map to refresh your world.
+        </Txt>
+      </Sheet>
+    );
+  }
   return (
     <Sheet
       title={own ? 'A little about you' : person.profile.displayName.split(' ')[0]}
@@ -139,6 +167,15 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
           {edit ? (
             <>
               <Field label="Display name" value={name} onChangeText={setName} maxLength={40} />
+              {cloud && (
+                <Field
+                  label="Username"
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                  maxLength={40}
+                />
+              )}
               <Field label="Your bio" value={bio} onChangeText={setBio} maxLength={160} multiline />
               <Field
                 label="Current status"
@@ -161,6 +198,7 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
           <Button kind="secondary" icon="zap" onPress={() => navigate({ name: 'availability' })}>
             Availability & intent
           </Button>
+          {cloud && <AvatarUpload />}
           <Txt weight="bold">Set the mood</Txt>
           <View style={[ui.row, { gap: 8 }]}>
             {(['light', 'dark', 'system'] as const).map((t) => (
@@ -173,9 +211,14 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
               />
             ))}
           </View>
-          <Button kind="danger" onPress={() => setConfirm('reset')}>
-            Delete local demo data
+          <Button kind="secondary" icon="user" onPress={() => navigate({ name: 'account' })}>
+            Your Zuno account
           </Button>
+          {!cloud && (
+            <Button kind="danger" onPress={() => setConfirm('reset')}>
+              Delete local demo data
+            </Button>
+          )}
         </>
       ) : (
         <>
@@ -242,9 +285,11 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
           </Txt>
           <Txt muted style={{ fontSize: 12, lineHeight: 19 }}>
             {confirm === 'reset'
-              ? 'Messages, meetups, profile edits and settings will be erased. A fresh sample world will replace them. No online account exists yet.'
+              ? 'Messages, meetups, profile edits and settings will be erased. A fresh sample world will replace them. Your online account, if any, is managed separately under Your Zuno account.'
               : confirm === 'report'
-                ? 'Reports are stored locally in this prototype and aren’t sent to a moderation team.'
+                ? cloud
+                  ? 'Your report is saved privately for review. For emergencies, contact local services.'
+                  : 'Reports are stored locally in this prototype and aren’t sent to a moderation team.'
                 : 'They’ll disappear from your map. Any temporary location access will end.'}
           </Txt>
           {confirm === 'report' && (
@@ -258,7 +303,7 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
             />
           )}
           <Button disabled={confirm === 'report' && !reason.trim()} onPress={() => void perform()}>
-            {confirm === 'report' ? 'Save local report' : 'Confirm'}
+            {confirm === 'report' ? (cloud ? 'Submit report' : 'Save local report') : 'Confirm'}
           </Button>
           <Button kind="quiet" onPress={() => setConfirm(null)}>
             Cancel

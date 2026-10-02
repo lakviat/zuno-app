@@ -1,9 +1,9 @@
 import { View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Txt } from './ui';
-import { useApp } from '../state/AppContext';
+import { useTheme } from '../state/AppContext';
 export function Brand({ small = false }: { small?: boolean }) {
-  const { colors } = useApp();
+  const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
       <Svg width={small ? 28 : 34} height={small ? 28 : 34} viewBox="0 0 40 40">

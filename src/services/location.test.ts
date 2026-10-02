@@ -8,12 +8,20 @@ vi.mock('expo-location', () => ({
   watchPositionAsync: native.watch,
 }));
 
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  native.check.mockResolvedValue({ status: 'undetermined', canAskAgain: true });
+});
 describe('foreground device location for distribution', () => {
   it('denial rejects without starting a watch or requiring a backend', async () => {
     native.request.mockResolvedValue({ status: 'denied' });
     await expect(deviceLocation.requestPermission()).rejects.toThrow('You can still explore');
     expect(native.watch).not.toHaveBeenCalled();
+  });
+  it('does not ask again after permanent denial', async () => {
+    native.check.mockResolvedValue({ status: 'denied', canAskAgain: false });
+    await expect(deviceLocation.requestPermission()).rejects.toThrow('Location is off');
+    expect(native.request).not.toHaveBeenCalled();
   });
   it('reports reduced precision and avoids a watcher that cannot satisfy the GPS filter', async () => {
     native.request.mockResolvedValue({ status: 'granted', ios: { accuracy: 'reduced' } });

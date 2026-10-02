@@ -15,7 +15,7 @@ export function Header({
   top: number;
   navigate: Navigate;
 }) {
-  const { colors, me, state } = useApp();
+  const { colors, me, state, cloud, signedIn, connected, syncError } = useApp();
   return (
     <View
       style={{
@@ -34,7 +34,15 @@ export function Header({
           <View style={{ gap: 2 }}>
             <Brand small={!wide} />
             <Txt muted style={{ fontSize: 10 }}>
-              Local preview · sample people
+              {cloud
+                ? !signedIn
+                  ? 'Sign in to your world'
+                  : syncError
+                    ? 'Reconnecting…'
+                    : connected
+                      ? 'Your shared world'
+                      : 'Connecting…'
+                : 'Local preview · sample people'}
             </Txt>
           </View>
           {wide && (
@@ -61,7 +69,7 @@ export function Header({
           >
             <Icon name="map-pin" size={14} color={colors.green} />
             <Txt weight="medium" style={{ fontSize: 12 }}>
-              Miami Beach, FL
+              {cloud ? 'Explore the map' : 'Miami Beach, FL'}
             </Txt>
             <View
               style={{ width: 1, height: 13, backgroundColor: colors.line, marginHorizontal: 3 }}
@@ -79,7 +87,7 @@ export function Header({
                 style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent }}
               />
               <Txt muted style={{ fontSize: 9, letterSpacing: 1.4 }}>
-                DEMO WORLD
+                {cloud ? 'YOUR WORLD' : 'DEMO WORLD'}
               </Txt>
             </View>
           )}

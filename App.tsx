@@ -6,6 +6,8 @@ import { DMSans_500Medium } from '@expo-google-fonts/dm-sans/500Medium';
 import { DMSans_700Bold } from '@expo-google-fonts/dm-sans/700Bold';
 import { Outfit_600SemiBold } from '@expo-google-fonts/outfit/600SemiBold';
 import { Outfit_700Bold } from '@expo-google-fonts/outfit/700Bold';
+import { AuthGate } from './src/features/account/AuthFlow';
+import { AccountProvider } from './src/features/account/AccountProvider';
 import { AppProvider } from './src/state/AppContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { LiveLocationProvider } from './src/features/location/LiveLocation';
@@ -34,11 +36,15 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <AppProvider>
-          <LiveLocationProvider>
-            <WorldScreen />
-          </LiveLocationProvider>
-        </AppProvider>
+        <AccountProvider>
+          <AuthGate>
+            <AppProvider>
+              <LiveLocationProvider>
+                <WorldScreen />
+              </LiveLocationProvider>
+            </AppProvider>
+          </AuthGate>
+        </AccountProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
   );

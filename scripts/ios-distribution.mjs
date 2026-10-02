@@ -12,8 +12,10 @@ import {
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withBackendEnvironment } from './backend-env.mjs';
 
-// No Apple login, signing, export, upload or external build service is invoked here.
+// Unsigned by default. --signed explicitly uses the owner's configured Xcode
+// account/Team for automatic provisioning. This script never exports or uploads.
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const key = createHash('sha256').update(project).digest('hex').slice(0, 10);
 const root = path.join(homedir(), 'Library/Developer/Zuno', `TestFlight-${key}`);
@@ -25,14 +27,38 @@ if (existsSync(root) && (!existsSync(marker) || readFileSync(marker, 'utf8') !==
 mkdirSync(source, { recursive: true });
 writeFileSync(marker, project);
 const prepareOnly = process.argv.includes('--prepare-only');
-if (process.argv.slice(2).some((arg) => arg !== '--prepare-only'))
-  throw new Error('Only --prepare-only is supported.');
+const signed = process.argv.includes('--signed');
+const device = process.argv
+  .slice(2)
+  .find((arg) => arg.startsWith('--device='))
+  ?.slice(9);
+if (
+  process.argv
+    .slice(2)
+    .some(
+      (arg) =>
+        !['--prepare-only', '--signed'].includes(arg) && !/^--device=[A-Fa-f0-9-]+$/.test(arg),
+    ) ||
+  (prepareOnly && (signed || device)) ||
+  (device && !signed)
+)
+  throw new Error(
+    'Use --prepare-only, --signed [--device=<UDID>], or no arguments for an unsigned archive.',
+  );
 const env = {
-  ...process.env,
+  ...withBackendEnvironment(project),
   NODE_ENV: 'production',
   EXPO_NO_DOTENV: '1',
   ZUNO_BUILD_CHANNEL: 'testflight',
 };
+if (signed) {
+  if (!/^[A-Z0-9]{10}$/.test(env.ZUNO_APPLE_TEAM_ID ?? ''))
+    throw new Error(
+      'Signed builds require your paid Apple Developer Team ID in ZUNO_APPLE_TEAM_ID and an authenticated Xcode account.',
+    );
+  if (!env.EXPO_PUBLIC_SUPABASE_URL || !env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+    throw new Error('Signed beta builds require the hosted Supabase public client configuration.');
+}
 
 function run(command, args, cwd, phase) {
   const log = path.join(root, `${phase}.log`);
@@ -84,15 +110,38 @@ run(
   source,
   'prebuild',
 );
+// Xcode launched from Finder does not inherit this process's environment. Keep
+// its bundle phase aligned with the CLI archive using only public app settings.
+// Never copy .env.local, provider secrets, or signing credentials into staging.
+const quoteShell = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+const xcodeEnvironment = {
+  NODE_BINARY: process.execPath,
+  EXPO_NO_DOTENV: '1',
+  ZUNO_BUILD_CHANNEL: 'testflight',
+  EXPO_PUBLIC_SUPABASE_URL: env.EXPO_PUBLIC_SUPABASE_URL,
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  EXPO_PUBLIC_TERMS_URL: env.EXPO_PUBLIC_TERMS_URL,
+  EXPO_PUBLIC_PRIVACY_URL: env.EXPO_PUBLIC_PRIVACY_URL,
+};
+writeFileSync(
+  path.join(source, 'ios/.xcode.env.local'),
+  '# Generated public app configuration for Xcode UI and CLI builds. No private credentials.\n' +
+    Object.entries(xcodeEnvironment)
+      .map(([name, value]) => `export ${name}=${quoteShell(value ?? '')}`)
+      .join('\n') +
+    '\n',
+  { mode: 0o600 },
+);
 copyFileSync(path.join(project, 'native/ios/Podfile.lock'), path.join(source, 'ios/Podfile.lock'));
 run('pod', ['install', '--deployment'], path.join(source, 'ios'), 'pods');
 const workspace = path.join(source, 'ios/Zuno.xcworkspace');
 console.log(
-  `Prepared workspace: ${workspace}\nScheme: Zuno\nAccount/signing is intentionally not configured by this script.`,
+  `Prepared workspace: ${workspace}\nScheme: Zuno\nSigning: ${signed ? 'Automatic, owner-supplied Team' : 'not performed'}`,
 );
 if (!prepareOnly) {
   const stamp = new Date().toISOString().replace(/[-:.]/g, '');
-  const archive = path.join(root, `Zuno-unsigned-${stamp}.xcarchive`);
+  const archive = path.join(root, `Zuno-${signed ? 'signed' : 'unsigned'}-${stamp}.xcarchive`);
+  const derivedData = path.join(root, signed ? 'DerivedData-signed' : 'DerivedData');
   run(
     'xcodebuild',
     [
@@ -103,30 +152,46 @@ if (!prepareOnly) {
       '-configuration',
       'Release',
       '-destination',
-      'generic/platform=iOS',
+      device ? `platform=iOS,id=${device}` : 'generic/platform=iOS',
       '-sdk',
       'iphoneos',
       '-derivedDataPath',
-      path.join(root, 'DerivedData'),
-      '-archivePath',
-      archive,
-      'CODE_SIGNING_ALLOWED=NO',
-      'CODE_SIGNING_REQUIRED=NO',
-      'CODE_SIGN_IDENTITY=',
-      'archive',
+      derivedData,
+      ...(device ? [] : ['-archivePath', archive]),
+      ...(signed
+        ? [
+            '-allowProvisioningUpdates',
+            `DEVELOPMENT_TEAM=${env.ZUNO_APPLE_TEAM_ID}`,
+            'CODE_SIGN_STYLE=Automatic',
+          ]
+        : ['CODE_SIGNING_ALLOWED=NO', 'CODE_SIGNING_REQUIRED=NO', 'CODE_SIGN_IDENTITY=']),
+      device ? 'build' : 'archive',
     ],
     source,
-    'archive',
+    device ? 'device-release' : signed ? 'archive-signed' : 'archive',
   );
+  const artifact = device
+    ? path.join(derivedData, 'Build/Products/Release-iphoneos/Zuno.app')
+    : archive;
   run(
     process.execPath,
-    [path.join(project, 'scripts/verify-ios-release.mjs'), archive],
+    [
+      path.join(project, 'scripts/verify-ios-release.mjs'),
+      artifact,
+      ...(signed ? ['--signed'] : []),
+    ],
     project,
     'verification',
   );
   console.log(readFileSync(path.join(root, 'verification.log'), 'utf8'));
-  writeFileSync(path.join(root, 'latest-archive.txt'), archive + '\n');
+  if (!device)
+    writeFileSync(
+      path.join(root, signed ? 'latest-signed-archive.txt' : 'latest-archive.txt'),
+      archive + '\n',
+    );
   console.log(
-    `Unsigned archive: ${archive}\nThis validates device code; it cannot be uploaded or installed without signing. Re-archive with your Team in Xcode later.`,
+    signed
+      ? `Signed ${device ? 'device Release' : 'archive'}: ${artifact}\nNot uploaded. Validate/distribute through Xcode Organizer after physical-device acceptance.`
+      : `Unsigned archive: ${archive}\nThis validates device code; it cannot be uploaded or installed without signing. Re-archive with your Team later.`,
   );
 }

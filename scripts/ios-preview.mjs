@@ -4,10 +4,12 @@ import { closeSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withBackendEnvironment } from './backend-env.mjs';
 
 // Build outside Desktop/iCloud: File Provider adds Finder metadata to generated
 // Swift frameworks there, which causes Xcode's nested code-sign step to fail.
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const env = { ...withBackendEnvironment(project), EXPO_NO_DOTENV: '1' };
 const key = createHash('sha256').update(project).digest('hex').slice(0, 10);
 const root = process.env.ZUNO_IOS_BUILD_ROOT || path.join(tmpdir(), `zuno-ios-${key}`);
 const source = path.join(root, 'source');
@@ -33,7 +35,7 @@ function run(command, args, cwd, phase) {
   const log = path.join(root, `${phase}.log`);
   console.log(`${phase} · ${log}`);
   const fd = openSync(log, 'w');
-  const result = spawnSync(command, args, { cwd, env: process.env, stdio: ['inherit', fd, fd] });
+  const result = spawnSync(command, args, { cwd, env, stdio: ['inherit', fd, fd] });
   closeSync(fd);
   if (result.error || result.status !== 0) {
     console.error(readFileSync(log, 'utf8').split('\n').slice(-35).join('\n'));
@@ -54,6 +56,13 @@ execFileSync('rsync', [
     '/dist/',
     '/docs/',
     '/public/',
+    '.env',
+    '.env.*',
+    '*.p8',
+    '*.p12',
+    '*.pem',
+    '*.key',
+    '*.mobileprovision',
     '.DerivedData/',
     '.build/',
   ].map((pattern) => `--exclude=${pattern}`),
@@ -84,7 +93,10 @@ run(
     `id=${device.udid}`,
     '-derivedDataPath',
     derived,
-    'CODE_SIGNING_ALLOWED=NO',
+    // A local ad-hoc signature lets the simulator access this app's Keychain.
+    // No Apple Team, certificate or provisioning profile is used.
+    'CODE_SIGNING_ALLOWED=YES',
+    'CODE_SIGN_IDENTITY=-',
     'ONLY_ACTIVE_ARCH=YES',
     'build',
   ],

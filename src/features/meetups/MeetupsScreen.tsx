@@ -52,7 +52,7 @@ export function MeetupsScreen({
         </Button>
       }
     >
-      {__DEV__ ? (
+      {__DEV__ && state.dataMode !== 'cloud' ? (
         <View style={{ gap: 8 }}>
           <Pressable
             accessibilityRole="button"
@@ -103,7 +103,9 @@ export function MeetupsScreen({
         </View>
       ) : (
         <Txt muted style={{ fontSize: 12 }}>
-          Local preview. Meetups and messages stay on this device.
+          {state.dataMode === 'cloud'
+            ? 'Meetups and chats are shared with their permitted audience.'
+            : 'Local preview. Meetups and messages stay on this device.'}
         </Txt>
       )}
       {clusterIds && (
