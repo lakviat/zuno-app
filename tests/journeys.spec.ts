@@ -239,6 +239,9 @@ for (const theme of ['Light', 'Dark'] as const) {
 test('drag reversal, stationary touch, release and repeated gestures retain map interactions', async ({
   page,
 }) => {
+  // Repeated pointer trajectories are paced by rendering. Software WebGL on CI
+  // needs more wall time; preserve every gesture and coordinate assertion.
+  if (process.env.CI) test.setTimeout(120000);
   const alex = page.getByRole('button', { name: 'Find Alex Rivera', exact: true });
   await expect(alex).toBeVisible({ timeout: 25000 });
   const grip = page.getByLabel('One-handed map zoom. Slide up to zoom in, down to zoom out.');

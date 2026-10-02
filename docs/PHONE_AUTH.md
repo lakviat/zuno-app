@@ -39,7 +39,7 @@ No SMS provider purchase, hosted Auth weakening, TestFlight upload, or new secre
 ## Validation for this change
 
 - 171 unit tests across 21 files passed, including phone-only account onboarding, concurrent-send protection, unavailable SMS, invalid/expired OTP and server verification of the local fixture code.
-- All 11 existing social/map browser journeys passed in one run. Both phone browser journeys passed: four visible methods, invalid number/code, resend cooldown, number correction, a second country, refresh restoration and logout. No Supabase requests were emitted by local preview.
+- All 11 existing social/map browser journeys passed locally in one run. The first hosted CI run passed 10 but exhausted the repeated-drag test’s 45-second total budget inside pointer movement. That test now has a 120-second CI-only budget for software WebGL, with every gesture and assertion retained. Both phone browser journeys passed: four visible methods, invalid number/code, resend cooldown, number correction, a second country, refresh restoration and logout. No Supabase requests were emitted by local preview.
 - TypeScript, ESLint, Prettier and workflow YAML validation passed.
 - Production web and iOS Hermes exports passed with the local flag deliberately enabled. Both bundles passed fixture-exclusion checks.
 - Connected iOS configuration includes Phone Number in its privacy manifest; no new system permission or capability was added.
