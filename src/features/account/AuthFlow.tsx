@@ -1,3 +1,4 @@
+import { normalizePhone, type PhoneAuth } from '../../backend/phoneAuth';
 import { Brand } from '../../components/Brand';
 import { useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import {
@@ -29,7 +30,7 @@ import {
 import { pickAvatar } from '../../backend/avatarUpload';
 import { useAvatarUrl } from '../../backend/useAvatarUrl';
 import { useAccount, backendConfig, supabase } from './AccountProvider';
-import { localTestLoginEnabled } from '../../backend/client';
+import { localPhonePreviewEnabled } from '../../backend/client';
 const colors = palette.light;
 function Copy({ children, title = false }: PropsWithChildren<{ title?: boolean }>) {
   return <Text style={title ? styles.title : styles.copy}>{children}</Text>;
@@ -84,9 +85,10 @@ function Frame({ children }: PropsWithChildren) {
     </SafeAreaView>
   );
 }
-function Welcome() {
+function Welcome({ phoneAuth, localHint }: { phoneAuth?: PhoneAuth; localHint?: string } = {}) {
   const account = useAccount();
-  const [emailFlow, setEmailFlow] = useState(false),
+  const [flow, setFlow] = useState<'welcome' | 'email' | 'phone'>('welcome'),
+    [localNotice, setLocalNotice] = useState(''),
     [email, setEmail] = useState(''),
     [sent, setSent] = useState(false),
     [resendAt, setResendAt] = useState(0),
@@ -102,6 +104,17 @@ function Welcome() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [resendAt]);
+  const emailFlow = flow === 'email';
+  const nativeSignIn = (provider: 'apple' | 'google' | 'email') => {
+    if (localHint) {
+      setLocalNotice(
+        'Use the iOS app for Apple, Google or email sign-in. This local preview tests phone signup with sample data.',
+      );
+      return;
+    }
+    if (provider === 'email') setFlow('email');
+    else void account.signIn(provider);
+  };
   const send = async () => {
     if (await account.signIn('email', email)) {
       setSent(true);
@@ -109,8 +122,18 @@ function Welcome() {
       setNow(Date.now());
     }
   };
+  if (flow === 'phone')
+    return (
+      <PhoneSignIn
+        auth={phoneAuth ?? account.phoneAuth}
+        onBack={() => setFlow('welcome')}
+        hint={localHint}
+      />
+    );
   return (
     <Frame>
+      {localHint && <Copy>{localHint}</Copy>}
+      {localNotice && <Copy>{localNotice}</Copy>}
       {!emailFlow && (
         <>
           <Copy title>Your people. A little closer.</Copy>
@@ -129,19 +152,22 @@ function Welcome() {
                 buttonStyle={Apple.AppleAuthenticationButtonStyle.BLACK}
                 cornerRadius={18}
                 style={{ height: 54, width: '100%' }}
-                onPress={() => void account.signIn('apple')}
+                onPress={() => nativeSignIn('apple')}
               />
             </View>
           ) : (
-            <Action quiet disabled={account.busy} onPress={() => void account.signIn('apple')}>
+            <Action quiet disabled={account.busy} onPress={() => nativeSignIn('apple')}>
               Continue with Apple
             </Action>
           )}
-          <Action quiet disabled={account.busy} onPress={() => void account.signIn('google')}>
+          <Action quiet disabled={account.busy} onPress={() => nativeSignIn('google')}>
             Continue with Google
           </Action>
-          <Action disabled={account.busy} onPress={() => setEmailFlow(true)}>
+          <Action disabled={account.busy} onPress={() => nativeSignIn('email')}>
             Continue with Email
+          </Action>
+          <Action disabled={account.busy} onPress={() => setFlow('phone')}>
+            Continue with Phone
           </Action>
         </>
       ) : (
@@ -178,7 +204,7 @@ function Welcome() {
             quiet
             disabled={account.busy}
             onPress={() => {
-              setEmailFlow(false);
+              setFlow('welcome');
               setSent(false);
             }}
           >
@@ -208,6 +234,140 @@ function Welcome() {
           ) : null,
         )}
       </View>
+    </Frame>
+  );
+}
+function PhoneSignIn({ auth, onBack, hint }: { auth: PhoneAuth; onBack(): void; hint?: string }) {
+  const [phone, setPhone] = useState('');
+  const [sentTo, setSentTo] = useState('');
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [resendAt, setResendAt] = useState(0);
+  const [now, setNow] = useState(Date.now);
+  const working = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!resendAt) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [resendAt]);
+  const perform = async (verify: boolean) => {
+    if (working.current || (!verify && Date.now() < resendAt)) return;
+    const target = sentTo || normalizePhone(phone);
+    if (!target) return;
+    working.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      if (verify) await auth.verify(target, code);
+      else {
+        // Also back off failed sends; repeated taps should not hammer an unavailable provider.
+        setResendAt(Date.now() + 60000);
+        setNow(Date.now());
+        await auth.request(target);
+        if (mounted.current) {
+          setSentTo(target);
+          setCode('');
+        }
+      }
+    } catch (issue) {
+      if (mounted.current)
+        setError(issue instanceof Error ? issue.message : 'Could not connect. Please try again.');
+    } finally {
+      working.current = false;
+      if (mounted.current) setBusy(false);
+    }
+  };
+  return (
+    <Frame>
+      <Copy title>{sentTo ? 'Enter your code' : 'Your phone, your people.'}</Copy>
+      {hint && <Copy>{hint}</Copy>}
+      {sentTo ? (
+        <>
+          <Copy>
+            {hint ? 'Continue with this test number:' : 'We sent a six-digit SMS code to'} {sentTo}
+          </Copy>
+          <Input
+            label="Verification code"
+            value={code}
+            onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))}
+            keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            autoComplete="sms-otp"
+            maxLength={6}
+            editable={!busy}
+            onSubmitEditing={() => {
+              if (code.length === 6) void perform(true);
+            }}
+          />
+          <Action disabled={busy || code.length !== 6} onPress={() => void perform(true)}>
+            {busy ? 'Please wait…' : 'Verify & continue'}
+          </Action>
+        </>
+      ) : (
+        <>
+          <Copy>
+            Include your country code. New here or coming back? Use the same number to sign in.
+          </Copy>
+          <Input
+            label="Phone number"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            textContentType="telephoneNumber"
+            autoCorrect={false}
+            maxLength={30}
+            placeholder="+1 202 555 0123"
+            editable={!busy}
+            onSubmitEditing={() => void perform(false)}
+          />
+          {!!phone && !normalizePhone(phone) && (
+            <Copy>Start with + and your country code, then your phone number.</Copy>
+          )}
+        </>
+      )}
+      {!!error && (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {error}
+        </Text>
+      )}
+      <Action
+        quiet={!!sentTo}
+        disabled={busy || now < resendAt || (!sentTo && !normalizePhone(phone))}
+        onPress={() => void perform(false)}
+      >
+        {now < resendAt
+          ? `Resend in ${Math.ceil((resendAt - now) / 1000)}s`
+          : sentTo
+            ? 'Resend code'
+            : busy
+              ? 'Sending…'
+              : 'Send code'}
+      </Action>
+      {sentTo && (
+        <Action
+          quiet
+          disabled={busy}
+          onPress={() => {
+            setSentTo('');
+            setCode('');
+            setError('');
+          }}
+        >
+          Change phone number
+        </Action>
+      )}
+      <Action quiet disabled={busy} onPress={onBack}>
+        Back
+      </Action>
     </Frame>
   );
 }
@@ -469,11 +629,12 @@ function Setup({ profile }: { profile: Onboarding }) {
 }
 export function AuthGate({ children }: PropsWithChildren) {
   const a = useAccount();
-  if (__DEV__ && localTestLoginEnabled) {
+  if (__DEV__ && localPhonePreviewEnabled) {
     // Keep the fixture module out of production bundles, including its credentials.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { LocalTestLogin } = require('./LocalTestLogin') as typeof import('./LocalTestLogin');
-    return <LocalTestLogin>{children}</LocalTestLogin>;
+    const { LocalPhonePreview } =
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('./LocalPhonePreview') as typeof import('./LocalPhonePreview');
+    return <LocalPhonePreview Welcome={Welcome}>{children}</LocalPhonePreview>;
   }
   if (backendConfig.status === 'unconfigured' && __DEV__) return children;
   if (backendConfig.status !== 'configured')

@@ -15,6 +15,7 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { parseAuthCallback, AUTH_REDIRECT } from '../../backend/authCallback';
 import { backendConfig, supabase, revokeLocalSession, beginSignIn } from '../../backend/client';
+import { requestPhoneCode, verifyPhoneCode, type PhoneAuth } from '../../backend/phoneAuth';
 import { endSessionServices } from '../../backend/sessionLifecycle';
 import { onboardingState, type Onboarding } from '../../backend/onboarding';
 
@@ -29,6 +30,7 @@ interface Account {
   reloadProfile(): Promise<void>;
   callback(url: string): Promise<void>;
   signIn(provider: 'apple' | 'google' | 'email', email?: string): Promise<boolean>;
+  phoneAuth: PhoneAuth;
   signOut(): Promise<void>;
   finish(visibility: Onboarding['visibility'], enabled: boolean): Promise<void>;
 }
@@ -290,6 +292,24 @@ export function AccountProvider({ children }: PropsWithChildren) {
       setBusy(false);
     }
   };
+  const withPhoneAuth = async (work: (client: NonNullable<typeof supabase>) => Promise<void>) => {
+    if (!supabase) throw new Error('SMS sign-in isn’t configured in this build.');
+    if (working.current) throw new Error('Please wait for the current sign-in attempt.');
+    working.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      await beginSignIn();
+      await work(supabase);
+    } finally {
+      working.current = false;
+      setBusy(false);
+    }
+  };
+  const phoneAuth: PhoneAuth = {
+    request: (phone) => withPhoneAuth((client) => requestPhoneCode(client, phone)),
+    verify: (phone, code) => withPhoneAuth((client) => verifyPhoneCode(client, phone, code)),
+  };
   const finish = async (visibility: Onboarding['visibility'], enabled: boolean) => {
     if (!supabase) return;
     const { error: issue } = await supabase.rpc('zuno_complete_onboarding', { visibility });
@@ -311,6 +331,7 @@ export function AccountProvider({ children }: PropsWithChildren) {
         callback,
         signIn,
         signOut,
+        phoneAuth,
         finish,
       }}
     >

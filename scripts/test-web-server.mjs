@@ -24,12 +24,19 @@ const env = {
   EXPO_NO_DOTENV: '1',
   EXPO_PUBLIC_SUPABASE_URL: '',
   EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: '',
-  EXPO_PUBLIC_LOCAL_TEST_LOGIN: '',
+  EXPO_PUBLIC_LOCAL_PHONE_PREVIEW: process.env.ZUNO_TEST_PHONE_PREVIEW === '1' ? '1' : '',
 };
 delete env.EXPO_NO_CLIENT_ENV_VARS;
 const child = spawn(
   process.execPath,
-  [path.join(root, 'node_modules/expo/bin/cli'), 'start', '--web', '--port', '8081', '--clear'],
+  [
+    path.join(root, 'node_modules/expo/bin/cli'),
+    'start',
+    '--web',
+    '--port',
+    process.env.ZUNO_TEST_PORT || '8082',
+    '--clear',
+  ],
   { cwd: stage, env, stdio: 'inherit' },
 );
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));

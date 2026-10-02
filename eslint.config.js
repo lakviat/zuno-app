@@ -5,6 +5,7 @@ module.exports = defineConfig([
   {
     ignores: [
       'dist/**',
+      'release-artifacts/**',
       'public/maplibre/**',
       '.expo/**',
       'test-results/**',

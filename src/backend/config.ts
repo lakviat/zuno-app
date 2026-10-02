@@ -4,7 +4,7 @@ export type BackendConfiguration =
   | { status: 'configured'; url: string; publishableKey: string };
 
 /** Explicit local preview only; never substitutes for real hosted authentication. */
-export function allowLocalTestLogin({
+export function allowLocalPhonePreview({
   development,
   platform,
   hostname,

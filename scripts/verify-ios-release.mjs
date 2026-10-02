@@ -50,8 +50,8 @@ for (const developmentOnly of [
   'Switch demo viewer',
   'Preview simulated movement (development)',
   'Try Noah to see what a non-friend',
-  'testing@test.com',
-  'Local test sign-in',
+  'Local phone preview',
+  'zuno.local-phone.session.v1',
 ]) {
   assert(
     !strings.includes(developmentOnly),
@@ -96,6 +96,7 @@ if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_PUB
   );
   for (const category of [
     'EmailAddress',
+    'PhoneNumber',
     'Name',
     'UserID',
     'OtherUserContent',

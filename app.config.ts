@@ -43,6 +43,7 @@ const config: ExpoConfig = {
       NSPrivacyCollectedDataTypes: cloudAccounts
         ? [
             'NSPrivacyCollectedDataTypeEmailAddress',
+            'NSPrivacyCollectedDataTypePhoneNumber',
             'NSPrivacyCollectedDataTypeName',
             'NSPrivacyCollectedDataTypeUserID',
             'NSPrivacyCollectedDataTypeOtherUserContent',

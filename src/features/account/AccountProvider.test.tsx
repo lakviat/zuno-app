@@ -15,6 +15,7 @@ const m = vi.hoisted(() => ({
   apple: vi.fn(),
   oauth: vi.fn(),
   otp: vi.fn(),
+  verify: vi.fn(),
   idToken: vi.fn(),
   exchange: vi.fn(),
   logout: vi.fn(),
@@ -64,6 +65,7 @@ vi.mock('../../backend/client', () => ({
       signInWithIdToken: m.idToken,
       signInWithOAuth: m.oauth,
       signInWithOtp: m.otp,
+      verifyOtp: m.verify,
       signOut: m.logout,
     },
     rpc: (name: string, args: unknown) => {
@@ -140,6 +142,11 @@ beforeEach(() => {
     return { error: null };
   });
   m.otp.mockResolvedValue({ error: null });
+  m.verify.mockImplementation(async () => {
+    m.session = A;
+    m.listener('SIGNED_IN', A);
+    return { data: { session: A }, error: null };
+  });
   m.logout.mockImplementation(async () => {
     m.session = null;
     m.listener('SIGNED_OUT', null);
@@ -234,6 +241,39 @@ describe('central account lifecycle (mocked provider/device boundary)', () => {
     });
     expect(m.otp).not.toHaveBeenCalled();
     expect(account.error).toContain('valid email');
+  });
+  it('phone code request stays signed out; verified phone resumes onboarding', async () => {
+    await mount();
+    await act(async () => {
+      await account.phoneAuth.request('+1 202 555 0123');
+    });
+    expect(account.session).toBeNull();
+    await act(async () => {
+      await account.phoneAuth.verify('+12025550123', '123456');
+    });
+    expect(account.session?.user.id).toBe('account-a');
+    expect(
+      startupRoute(account.ready, !!account.session, account.loadingProfile, account.onboarding),
+    ).toBe('profile');
+    expect(account.busy).toBe(false);
+  });
+  it('invalid phone OTP leaves the account signed out and retryable', async () => {
+    m.verify.mockResolvedValue({ data: { session: null }, error: { code: 'otp_expired' } });
+    await mount();
+    await act(async () => {
+      await expect(account.phoneAuth.verify('+12025550123', '000000')).rejects.toThrow();
+    });
+    expect(account.session).toBeNull();
+    expect(account.busy).toBe(false);
+  });
+  it('serializes phone sends to prevent double-tap SMS requests', async () => {
+    await mount();
+    await act(async () => {
+      const pending = account.phoneAuth.request('+12025550123');
+      await expect(account.phoneAuth.request('+12025550123')).rejects.toThrow('wait');
+      await pending;
+    });
+    expect(m.otp).toHaveBeenCalledTimes(1);
   });
   it('AUTH-08 restored incomplete account resumes saved location stage', async () => {
     m.session = A;

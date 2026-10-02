@@ -7,6 +7,7 @@ Implemented against the existing Supabase social backend on October 1, 2026. No 
 - **Apple: PARTIAL.** Native Apple sheet, cryptographic nonce/state, Supabase ID-token exchange, cancellation and first-name capture implemented. `usesAppleSignIn` and Expo's Apple plugin prepare the entitlement. Hosted Apple provider is currently disabled; owner Team/App ID configuration and a physical iPhone sign-in remain required.
 - **Google: PARTIAL.** Supabase PKCE browser authentication, exact app callback, cancellation and returning-account handling implemented. Hosted Google provider is disabled pending OAuth client setup. Provider name initializes an unfinished profile once; customized names are never overwritten. Provider email stays in Auth. Photos are optional; Zuno uses its own private Storage photo rather than repeatedly replacing it with an external provider image.
 - **Email: PARTIAL.** One magic-link flow creates or restores an account, validates email, offers a 60-second resend delay and gives neutral delivery/error copy. Hosted email provider is enabled. Owner-controlled tester email/SMTP configuration is still needed to verify hosted delivery. No real email was sent during this task.
+- **Phone: PARTIAL.** International phone entry, Supabase SMS OTP signup/sign-in, six-digit verification, resend cooldown and the existing profile/location onboarding are implemented. Hosted phone provider is disabled pending SMS provider setup and real delivery testing. The local `000000` fixture is web/loopback/development/opt-in only, excluded from Release, and creates no hosted identity. See [phone setup](docs/PHONE_AUTH.md).
 - **Notifications: PARTIAL.** Optional permission/status/Settings and contextual explanation component implemented, with a persistent Not Now preference. `pushDeliveryReady=false` deliberately gates the native prompt because there is no sender or private multi-device token registry. Account settings accurately explain that push is unavailable. No APNs entitlement, background mode or token upload was added. Wire this gate and the contextual component after a successful friendship/conversation/meetup action only when delivery exists.
 
 ## Startup and current-user state
@@ -14,7 +15,7 @@ Implemented against the existing Supabase social backend on October 1, 2026. No 
 `AccountProvider → AuthGate → account-keyed AppProvider → LiveLocationProvider → existing WorldScreen`.
 
 1. Supabase restores the Keychain session behind the bootstrap view.
-2. No session → welcome with Apple / Google / Email.
+2. No session → welcome with Apple / Google / Email / Phone.
 3. Session + missing/unavailable profile → retry view. A temporary network failure does not erase credentials.
 4. Session + `step=profile` → minimal profile.
 5. Session + `step=location` → combined location explanation/privacy choice.

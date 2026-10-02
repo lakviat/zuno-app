@@ -62,6 +62,7 @@
     "check": "npm run typecheck && npm run lint && npm test",
     "build:web": "expo export --platform web",
     "test:e2e": "playwright test",
+    "test:e2e:phone": "ZUNO_TEST_PHONE_PREVIEW=1 playwright test",
     "build:native": "expo export --platform ios --platform android",
     "postinstall": "node scripts/prepare-web.mjs",
     "test:backend": "node scripts/test-supabase-local.mjs"

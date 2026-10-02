@@ -1,0 +1,61 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: '1'
+      EXPO_NO_DOTENV: '1'
+      EXPO_PUBLIC_SUPABASE_URL: ''
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ''
+      # Prove that even an accidentally enabled flag cannot ship the fixture.
+      EXPO_PUBLIC_LOCAL_PHONE_PREVIEW: '1'
+      ZUNO_BUILD_CHANNEL: testflight
+      ZUNO_TEST_PORT: '8082'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.23.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run format:check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: npm run test:e2e:phone
+      - name: Export production web
+        run: npm run build:web -- --output-dir dist/web
+      - name: Export production iOS JavaScript and assets (unsigned)
+        run: npx expo export --platform ios --output-dir dist/ios
+      - name: Verify production authentication boundary
+        run: node scripts/verify-production-export.mjs dist/web dist/ios
+      - uses: actions/upload-artifact@v7
+        with:
+          name: production-exports
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-test-diagnostics
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore

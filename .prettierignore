@@ -7,3 +7,7 @@ playwright-report
 
 public/maplibre
 npm-debug.log
+
+release-artifacts
+ios
+android

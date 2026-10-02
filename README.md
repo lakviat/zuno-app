@@ -17,19 +17,27 @@ npm run ios:preview
 
 With valid Supabase configuration, sign in from the welcome screen on iOS, complete onboarding, then open the map. No demo world is uploaded or used as a fallback. With no configuration, an explicitly labeled local sample world remains available for development and browser regression tests; see [local-preview guide](docs/LOCAL_PREVIEW.md).
 
-### Temporary localhost test login
+### Temporary localhost phone preview
 
-For browser-only sample testing, put `EXPO_PUBLIC_LOCAL_TEST_LOGIN=1` in ignored `.env.local`, run `npm start`, and open `http://localhost:8081`:
+For browser-only sample testing, put `EXPO_PUBLIC_LOCAL_PHONE_PREVIEW=1` in ignored `.env.local`, run `npm start`, and open `http://localhost:8081`:
 
-- Email: `testing@test.com`
-- PIN: `0000`
-- Verification code: `000000` (six zeros; no email is sent)
+1. Choose **Continue with Phone** from the four-method welcome screen.
+2. Enter any international-format number, such as `+1 202 555 0123`.
+3. Enter **000000** (six zeros). No SMS is sent.
 
-This opens the **Testing** sample profile with local friends/meetups. The banner includes **Sign out of local test**. Sample edits persist in a separate browser storage key; the login marker lasts for the tab session. This fixture does not create a hosted user or validate real authentication. It requires all three guards: development build, web, and an exact loopback hostname. Native, LAN-hosted and production builds use normal authentication even if the flag is present. Remove the flag and restart Expo to disable it. The fixture module is excluded from production bundles.
+This opens the **Local Explorer** sample profile. **Sign out of local preview** clears the tab session. Sample edits use a separate browser storage key; no phone number/code is stored and no Supabase account/session is created. Email/PIN test login has been removed. Other providers continue to use real authentication in the iOS app.
+
+The bypass requires **all four**: development build, web platform, an exact loopback hostname, and the explicit flag. It cannot run on native iOS, a LAN hostname, TestFlight, or a production website. The entire fixture module is excluded from production bundles. Remove the flag and restart Expo to disable it. Remove the fixture before the next TestFlight upload; see [phone-auth setup and removal checklist](docs/PHONE_AUTH.md).
+
+## Continuous integration
+
+`.github/workflows/build.yml` runs typechecking, lint, unit tests, formatting, browser journeys, web export, and iOS JavaScript/Hermes export on pushes to `main` and pull requests. Export validation checks that local test authentication is absent even when its flag is deliberately set. Export artifacts contain no live environment configuration. Native signing/archive/upload remains a separate owner-controlled step. This Expo project has no Docker image/container to build.
+
+Browser regression tests use isolated port **8082**, leaving your interactive Expo server on **8081** running.
 
 ## Connected behavior
 
-- Email magic links with PKCE, native Keychain sessions and account deletion.
+- Email magic links with PKCE, Apple, Google and phone/SMS signup; native Keychain sessions and account deletion. Hosted providers require their own configuration.
 - Profile/username/bio/availability and private avatar uploads.
 - Exact-username discovery, requests, accepted friends, removal and bilateral blocking.
 - Private by default; choose Friends or Public, exact/neighborhood precision and optional speed/heading, then explicitly enable foreground device location. Backgrounding stops publication.

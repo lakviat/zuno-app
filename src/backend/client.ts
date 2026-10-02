@@ -3,18 +3,18 @@ import './crypto';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { createClient, processLock } from '@supabase/supabase-js';
-import { allowLocalTestLogin, backendConfiguration } from './config';
+import { allowLocalPhonePreview, backendConfiguration } from './config';
 import { decodedSessionStorage, revocableSessionStorage } from './sessionStorage';
 
-export const localTestLoginEnabled =
+export const localPhonePreviewEnabled =
   __DEV__ &&
-  allowLocalTestLogin({
+  allowLocalPhonePreview({
     development: __DEV__,
     platform: Platform.OS,
     hostname: typeof window !== 'undefined' ? (window.location?.hostname ?? '') : '',
-    flag: process.env.EXPO_PUBLIC_LOCAL_TEST_LOGIN,
+    flag: process.env.EXPO_PUBLIC_LOCAL_PHONE_PREVIEW,
   });
-export const backendConfig = localTestLoginEnabled
+export const backendConfig = localPhonePreviewEnabled
   ? { status: 'unconfigured' as const }
   : backendConfiguration(
       process.env.EXPO_PUBLIC_SUPABASE_URL,

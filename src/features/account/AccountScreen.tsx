@@ -147,7 +147,9 @@ function AccountContent({ navigate }: { navigate: Navigate }) {
         <ActivityIndicator accessibilityLabel="Restoring account" />
       ) : session ? (
         <>
-          <Txt weight="bold">Signed in as {session.user.email}</Txt>
+          <Txt weight="bold">
+            Signed in as {session.user.email || session.user.phone || 'your Zuno account'}
+          </Txt>
           {!profileReady ? (
             <Button
               kind="secondary"

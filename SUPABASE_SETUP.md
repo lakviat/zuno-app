@@ -29,6 +29,8 @@ Metro must restart after an environment change. Native preparation passes only t
 
 ## Auth and photos
 
+Phone signup is implemented through Supabase SMS OTP and shares the UUID-based onboarding/RLS model. Hosted phone authentication is currently disabled; configure an SMS provider before real-device phone testing. See [phone setup and local preview](docs/PHONE_AUTH.md). No phone column is added to public profiles.
+
 Email magic links use PKCE/S256 and native secure randomness. Open the requested link on the **same iPhone** that initiated it. Exact callback parsing rejects implicit bearer-token URLs. Native sessions and flow verifiers use SecureStore/Keychain with device-only accessibility, not AsyncStorage; large sessions use atomic chunk replacement. Auth refresh pauses in the background. Browser preview does not initiate email sign-in.
 
 The simulator uses a local ad-hoc signature so Keychain works without a Developer Team. Physical iPhones require normal Apple signing.

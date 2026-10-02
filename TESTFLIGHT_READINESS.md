@@ -2,11 +2,13 @@
 
 Updated October 1, 2026, for the requested **real multiuser backend** beta. Earlier local-preview findings are preserved in [the historical audit](docs/TESTFLIGHT_AUDIT_2026-10-01.md).
 
+Phone-auth update: four signup methods are implemented. The temporary localhost email/PIN fixture was replaced with a guarded phone preview; remove it before the next upload. See [SMS activation and removal checklist](docs/PHONE_AUTH.md). The earlier native archive evidence below predates this update; current phone UI validation is recorded in that checklist.
+
 ## Current Status
 
-**READY FOR SIGNING** for engineering preparation. The unsigned Release archive passes and the hosted social/onboarding schema is deployed and verified. This is not certification of a fully accepted hosted beta: Apple/Google provider configuration, hosted email delivery, legal URLs and physical iPhone acceptance remain before distribution.
+**READY FOR SIGNING** for engineering preparation. The unsigned Release archive passes and the hosted social/onboarding schema is deployed and verified. This is not certification of a fully accepted hosted beta: Apple/Google/SMS provider configuration, hosted email delivery, legal URLs and physical iPhone acceptance remain before distribution.
 
-For the current authorized distribution attempt, the owner refreshed Xcode sign-in. Xcode exposes only Personal Team, Developer enrollment is Pending, and App Store Connect says the account is not enabled. No signing certificates, upload, publication, external Git push or paid service was performed. See [current distribution status](docs/TESTFLIGHT_DISTRIBUTION.md). See [authentication architecture](AUTH_ONBOARDING_ARCHITECTURE.md) and [hosted validation](docs/HOSTED_BACKEND_VALIDATION.md).
+For the current authorized distribution attempt, the owner refreshed Xcode sign-in. Xcode exposes only Personal Team, Developer enrollment is Pending, and App Store Connect says the account is not enabled. No signing certificates, upload, public app publication or paid service was performed. Source code has since been pushed to GitHub with owner authorization. See [current distribution status](docs/TESTFLIGHT_DISTRIBUTION.md). See [authentication architecture](AUTH_ONBOARDING_ARCHITECTURE.md) and [hosted validation](docs/HOSTED_BACKEND_VALIDATION.md).
 
 ## Project
 
@@ -54,9 +56,9 @@ Upstream RN Maps/SVG deprecations, SDK script output warnings and skipped App In
 
 ## Tests
 
-- **136 tests across 20 files PASS:** existing domain/zoom/location behavior, Auth config/callback/Keychain, account SQL/RLS, social PostgreSQL/PostGIS policies/commands and cloud transport lifecycle/account isolation.
+- **171 tests across 21 files PASS (phone-auth update):** existing domain/zoom/location behavior, Auth config/callback/Keychain, account SQL/RLS, social PostgreSQL/PostGIS policies/commands, cloud transport lifecycle/account isolation and phone OTP validation/onboarding. Two additional localhost phone browser journeys pass; see docs/PHONE_AUTH.md.
 - **11 real local Supabase integration checks PASS:** three authenticated accounts; actual Realtime inbox denial/delivery; private/friends/public; 25 mph from m/s; block while connected; coarse projection; stop/reconnect; persistent/idempotent private chat; concurrent final meetup seat and leave revocation; private Storage ownership; anonymous/raw-GPS denial. Final invalidation-only transport was retested. Zero disposable accounts remain. Cron is active.
-- **11 browser journeys PASS across the full run and isolated rerun:** 10 passed together; drag-reversal timed out during concurrent native builds, then passed unchanged in 34.2 seconds after builds finished. No assertions or timeouts were weakened. These use Development-only local preview, not hosted authentication.
+- **13 browser journeys PASS (phone-auth update):** all 11 existing social/map/zoom journeys passed together; both new phone signup/cooldown/session/logout journeys passed. These use Development-only local preview, not hosted authentication.
 - **67 hosted SQL/RLS assertions PASS:** 49 social + 18 onboarding, synthetic identities fully rolled back. Final schema comparison: 282 audited objects with zero differences. Real hosted email/OAuth/WebSocket/device acceptance remains separate.
 
 - TypeScript, ESLint and Expo dependency compatibility PASS. Prettier and `git diff --check` PASS. Final source and generated archive include the modern photo-picker fix.
@@ -124,7 +126,7 @@ Foreground Core Location and MapKit display need no extra portal capability. Sec
 
 Generated `PrivacyInfo.xcprivacy` is valid and reproducible from app.config.ts. Required reasons remain SDK-derived: User Defaults CA92.1; File Timestamp C617.1 / 0A2A.1 / 3B52.1; Boot Time 35F9.1; Disk Space E174.1 / 85F4.1. Native SDK manifests, including the supplied RN Maps manifest, are bundled and checked.
 
-Connected builds now declare linked email, name, user ID, other user content, precise/coarse location and photos/videos for app functionality, with tracking false. This reflects actual Auth/social/GPS/avatar features and supersedes the previous local-only declaration. Owner must still review App Store privacy labels, provide a privacy policy/support contact, explain location expiry/backup limitations and moderation, and answer export compliance. `ITSAppUsesNonExemptEncryption` is intentionally unset pending that answer. No legal assertion is invented.
+Connected builds now declare linked email, phone number, name, user ID, other user content, precise/coarse location and photos/videos for app functionality, with tracking false. This reflects actual Auth/social/GPS/avatar features and supersedes the previous local-only declaration. Owner must still review App Store privacy labels, provide a privacy policy/support contact, explain location expiry/backup limitations and moderation, and answer export compliance. `ITSAppUsesNonExemptEncryption` is intentionally unset pending that answer. No legal assertion is invented.
 
 No accumulating GPS-history table. The latest durable row is overwritten at most every 30 seconds; the faster cache is UNLOGGED, overwritten and expires after 90 seconds. Cron physically removes expired rows every five minutes. Broker messages contain only invalidations/removed IDs. Previously delivered data and still-valid avatar URLs cannot be retroactively erased; avatars expire after 60 seconds. Hosted retention/backups must be reflected in the owner's policy.
 

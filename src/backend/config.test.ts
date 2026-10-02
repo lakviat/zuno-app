@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowLocalTestLogin, backendConfiguration } from './config';
+import { allowLocalPhonePreview, backendConfiguration } from './config';
 const url = 'https://zuno-test.supabase.co';
 const key = 'sb_publishable_test-only';
 describe('local sample login boundary', () => {
@@ -7,7 +7,7 @@ describe('local sample login boundary', () => {
   it.each(['localhost', '127.0.0.1', '[::1]'])(
     'permits explicit loopback development at %s',
     (hostname) => {
-      expect(allowLocalTestLogin({ ...local, hostname })).toBe(true);
+      expect(allowLocalPhonePreview({ ...local, hostname })).toBe(true);
     },
   );
   it.each([
@@ -20,7 +20,7 @@ describe('local sample login boundary', () => {
     { hostname: 'localhost.example.com' },
     { hostname: 'example.com' },
   ])('fails closed outside explicit localhost development: %j', (override) => {
-    expect(allowLocalTestLogin({ ...local, ...override })).toBe(false);
+    expect(allowLocalPhonePreview({ ...local, ...override })).toBe(false);
   });
 });
 describe('public Supabase build configuration', () => {
