@@ -20,8 +20,16 @@ describe('phone authentication', () => {
       expect(normalizePhone(phone)).toMatch(/^\+[1-9]\d{6,14}$/);
     },
   );
+  it.each(['2025550123', '(202) 555-0123', '202-555-0123', '1 202 555 0123'])(
+    'defaults a US number to +1: %s',
+    (phone) => {
+      expect(normalizePhone(phone)).toBe('+12025550123');
+    },
+  );
   it.each([
-    '2025550123',
+    '202555012',
+    '5550123',
+    '+1202555012',
     '+0123456789',
     '+123',
     '+1234567890123456',
@@ -77,7 +85,7 @@ describe('phone authentication', () => {
       const f = fixture();
       f.signInWithOtp.mockResolvedValue({ error: { code, message: 'private provider details' } });
       await expect(requestPhoneCode(f.client, '+12025550123')).rejects.toThrow(
-        'Try email, Apple or Google',
+        'Go back to choose another sign-in method',
       );
     },
   );

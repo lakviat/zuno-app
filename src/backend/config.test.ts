@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowLocalPhonePreview, backendConfiguration } from './config';
+import { allowPhonePreview, backendConfiguration } from './config';
 const url = 'https://zuno-test.supabase.co';
 const key = 'sb_publishable_test-only';
 describe('local sample login boundary', () => {
@@ -7,7 +7,7 @@ describe('local sample login boundary', () => {
   it.each(['localhost', '127.0.0.1', '[::1]'])(
     'permits explicit loopback development at %s',
     (hostname) => {
-      expect(allowLocalPhonePreview({ ...local, hostname })).toBe(true);
+      expect(allowPhonePreview({ ...local, hostname })).toBe(true);
     },
   );
   it.each([
@@ -20,7 +20,23 @@ describe('local sample login boundary', () => {
     { hostname: 'localhost.example.com' },
     { hostname: 'example.com' },
   ])('fails closed outside explicit localhost development: %j', (override) => {
-    expect(allowLocalPhonePreview({ ...local, ...override })).toBe(false);
+    expect(allowPhonePreview({ ...local, ...override })).toBe(false);
+  });
+});
+describe('Expo Go iOS phone testing boundary', () => {
+  const local = { development: true, platform: 'ios', hostname: '', expoGo: true, expoGoFlag: '1' };
+  it('permits explicitly enabled iOS Expo Go development', () => {
+    expect(allowPhonePreview(local)).toBe(true);
+  });
+  it.each([
+    { development: false },
+    { expoGo: false },
+    { expoGoFlag: undefined },
+    { expoGoFlag: '0' },
+    { platform: 'android' },
+    { platform: 'web' },
+  ])('rejects Release, other clients and absent opt-in: %j', (override) => {
+    expect(allowPhonePreview({ ...local, ...override })).toBe(false);
   });
 });
 describe('public Supabase build configuration', () => {

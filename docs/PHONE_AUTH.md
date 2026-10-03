@@ -1,47 +1,64 @@
-# Phone signup and temporary local testing
+# Phone signup and temporary testing
 
-The welcome screen now has Email, Google, Apple and Phone. Phone authentication uses Supabase Auth's SMS OTP flow for both signup and returning users. Existing UUID-based profiles, onboarding, RLS and sign-out cleanup are shared by every provider. No database migration is needed. Phone numbers remain in Supabase Auth; they are not added to discoverable social profiles or logs.
+Updated October 2, 2026. The welcome screen has Email, Google, Apple and Phone. Real phone authentication uses Supabase Auth SMS OTP for signup and returning users, sharing the existing UUID-based profiles, onboarding, RLS and sign-out cleanup. No database migration is needed. Phone numbers stay in Auth, outside discoverable social profiles and logs.
 
-Hosted settings checked on October 1, 2026: email enabled; phone, Google and Apple disabled. This change does not claim successful real SMS delivery.
+Read-only hosted settings rechecked: email enabled; phone, Google and Apple disabled. Real SMS and OAuth sign-in are **not yet accepted**. No hosted settings were changed by this fix.
 
-## Hosted activation
+## Expo Go on iPhone and localhost
 
-1. Configure an SMS provider in the hosted Zuno project's Authentication → Providers → Phone settings. Provider credentials stay in Supabase, never in the app or GitHub.
-2. Enable phone sign-in and phone signup with six-digit OTPs. Keep verification enabled; do not configure a shared test code for arbitrary real users.
-3. Set appropriate SMS rate limits, permitted countries and abuse controls before making signup public. If CAPTCHA is enabled later, add its supported client challenge to the flow before rollout.
-4. Test delivery to an owner-controlled iPhone, invalid/expired codes, resend, interrupted onboarding, returning accounts, logout and session restoration. Real delivery and provider billing are not simulated by localhost testing.
-5. Update published privacy text and App Store privacy answers to include phone numbers used for authentication. The app's configured iOS privacy manifest now includes linked Phone Number data for app functionality, without tracking.
+The previous test fixture worked only in a loopback browser. An iPhone running Expo Go therefore contacted the disabled SMS provider, stayed on phone entry and incorrectly started a resend countdown. The corrected native test path never sends an SMS or requests a hosted session.
 
-The app normalizes international numbers, requires a country code, accepts six digits, prevents concurrent requests, and applies a 60-second resend cooldown. Offline, unavailable-provider and invalid-code errors keep the user signed out. No contacts or SMS-reading permission is requested. iOS one-time-code autofill is supported.
+1. Set `EXPO_PUBLIC_EXPO_GO_PHONE_PREVIEW=1` in ignored `.env.local` for **iOS Expo Go**. For the localhost browser, separately set `EXPO_PUBLIC_LOCAL_PHONE_PREVIEW=1`.
+2. Restart with `npx expo start --go --lan`. Keep the Mac and iPhone on the same Wi-Fi, scan the displayed QR, and reload the Zuno project in Expo Go to receive the updated bundle. This is a development bundle, not a TestFlight upload or new Expo Go binary.
+3. Choose **Continue with Phone**. Enter any ten-digit US number, such as `202-555-0123`, and press **Continue**. A leading `+1` is optional; formatting is normalized. Nine-digit US numbers are incomplete. International input still accepts an explicit country code.
+4. On **Enter your code**, enter **000000** and press **Verify & continue**. Wrong codes keep the user on verification. Four digits cannot submit. Test-mode resend and changing the number have no cooldown.
+5. The map opens with **Phone test mode · sample data** and a **Sign out of phone test** button. Sign out returns to welcome; entering Phone again starts a fresh flow.
 
-Email-only and phone-only sign-ins can represent separate accounts. This change does not merge identities or accounts automatically. Use the same sign-in method to return to the same account.
+This opens the **Local Explorer** sample account. It does not prove ownership of a number, create a Supabase user, exercise real onboarding, or grant access to hosted data. Only a signed-in marker is persisted: iOS AsyncStorage restores after an Expo Go restart; web sessionStorage lasts for the tab. Phone numbers and codes are never persisted. Sample edits remain in `zuno.local-phone.data.v1`; preview sign-out removes `zuno.local-phone.session.v1` and stops session services. The retired browser email/PIN fixture's marker/data are removed when the preview mounts.
 
-Reference: [Supabase phone sign-in](https://supabase.com/docs/guides/auth/phone-login).
+The boundary requires `__DEV__` and either:
 
-## Local preview only
+- iOS, `isRunningInExpoGo()` from Expo, and `EXPO_PUBLIC_EXPO_GO_PHONE_PREVIEW=1`; or
+- web, an exact loopback hostname, and `EXPO_PUBLIC_LOCAL_PHONE_PREVIEW=1`.
 
-Set `EXPO_PUBLIC_LOCAL_PHONE_PREVIEW=1` in ignored `.env.local` and run Expo on localhost. Choose Phone, enter any syntactically valid international number and use **000000**. No SMS, hosted user or backend session is created. The preview displays a sample-data banner, uses a separate sample storage namespace and stores only a signed-in marker in sessionStorage. Phone numbers/codes are not persisted. Sign-out removes the marker; closing the tab ends that preview session.
+Zuno's own development client, standalone iOS, TestFlight and production websites cannot use the bypass. Do not substitute `Constants.executionEnvironment` for exact Expo Go detection: a development client can share its StoreClient classification. The fixture is lazy-loaded and eliminated from production bundles. Both CI export validation and the iOS archive validator check for leaked fixture markers. Real authentication always asks Supabase to verify the submitted code, including all zeros.
 
-The previous email/PIN login and its screenshot were removed. Its old session marker and sample data are retired when the new preview mounts.
+## Google, Apple and email in Expo Go
 
-Guard conditions: `__DEV__`, web platform, exact loopback hostname, explicit opt-in flag. Native and Release authentication always verifies codes with Supabase, including a submitted all-zero code. The preview module is removed from production bundles and checked by CI and the iOS archive validator.
+These buttons are disabled with an explanation in phone test mode. The account layer also prevents external sign-in handoffs in Expo Go. No fake Google or Apple session is created.
+
+- **Google:** this app uses Supabase browser OAuth with `zuno://auth/callback`. Expo Go cannot own that custom callback. Use an installed Zuno development/standalone build and configure Google OAuth in Supabase first. [Expo authentication guidance](https://docs.expo.dev/guides/authentication/).
+- **Apple:** Expo's native Apple API can be exercised in Expo Go, but its identifiers differ from the standalone application. The Zuno Supabase Apple provider is disabled. Finish Zuno's Apple capability/provider configuration and validate its actual signed client. Do not treat an Expo Go Apple sheet as proof of Zuno authentication. [Expo Apple authentication documentation](https://docs.expo.dev/versions/latest/sdk/apple-authentication/).
+- **Email:** hosted email is enabled, but the current magic link uses the same Zuno callback. Validate delivery and return-to-app in a Zuno build that owns that scheme.
+
+The normal connected Zuno build retains its existing real provider implementations. Remaining provider/client credentials and Apple enrollment are setup blockers; this fix does not claim they are resolved. The blue floating gear is Expo Go's developer menu, outside Zuno's UI.
+
+## Hosted SMS activation
+
+1. Configure an SMS provider in the hosted project's Authentication → Providers → Phone settings. Provider credentials stay in Supabase, never in the app or GitHub.
+2. Enable phone signup/sign-in with six-digit OTPs. Keep verification enabled; do not configure a shared test code for arbitrary real users.
+3. Set SMS rate limits, permitted countries and abuse controls before public signup. If CAPTCHA is enabled later, implement its client challenge before rollout.
+4. Test delivery to an owner-controlled iPhone, invalid/expired codes, resend, interrupted onboarding, returning users, logout and session restoration. Sample testing does not simulate delivery, billing or a real authenticated database account.
+5. Update published privacy text and App Store privacy answers for authentication phone numbers. The existing iOS privacy manifest includes linked Phone Number data for app functionality without tracking.
+
+Real SMS has a 60-second resend cooldown after a successful send or a rate-limit response. A provider-disabled/offline failure does not impose a false cooldown. Concurrency guards prevent overlapping requests. No contacts or SMS-reading permission is requested; iOS one-time-code autofill is supported.
+
+Email-only and phone-only sign-ins can be separate accounts. Identities are not automatically merged. Use the same sign-in method to return to the same account. [Supabase phone sign-in](https://supabase.com/docs/guides/auth/phone-login).
 
 ## Remove before the next TestFlight upload
 
-- Remove `EXPO_PUBLIC_LOCAL_PHONE_PREVIEW` from local configuration and restart Expo.
-- Delete `LocalPhonePreview.tsx`, its guarded `AuthGate` branch, the preview configuration helper and sample-repository override. Keep real phone authentication and its tests.
-- Clear `zuno.local-phone.session.v1` and `zuno.local-phone.data.v1` from the testing browser.
-- Retain production-exclusion checks and the test proving the server rejects an invalid all-zero code.
-- Verify real SMS delivery and update phone-number privacy disclosures before inviting phone-auth testers.
+- Remove **both** `EXPO_PUBLIC_LOCAL_PHONE_PREVIEW` and `EXPO_PUBLIC_EXPO_GO_PHONE_PREVIEW` from local configuration and restart Expo.
+- Delete `LocalPhonePreview.tsx`, its tests, guarded `AuthGate` branch, preview configuration helper and sample-repository override. Keep real Supabase phone authentication and its verification tests.
+- Clear the preview session/data keys from the testing browser and Expo Go's AsyncStorage.
+- Retain production-exclusion checks and the test proving the real server verifies an all-zero code.
+- Validate real SMS delivery and update privacy disclosures before inviting phone-auth testers.
 
-No SMS provider purchase, hosted Auth weakening, TestFlight upload, or new secret is part of this change.
+The October 2 removal reminder was delivered. The owner subsequently requested continued Expo Go testing with the temporary code; the removal checklist still applies before the next upload.
 
-## Validation for this change
+## Validation
 
-- 171 unit tests across 21 files passed, including phone-only account onboarding, concurrent-send protection, unavailable SMS, invalid/expired OTP and server verification of the local fixture code.
-- All 11 existing social/map browser journeys passed locally in one run. The first hosted CI run passed 10 but exhausted the repeated-drag test’s 45-second total budget inside pointer movement. That test now has a 120-second CI-only budget for software WebGL, with every gesture and assertion retained. Both phone browser journeys passed: four visible methods, invalid number/code, resend cooldown, number correction, a second country, refresh restoration and logout. No Supabase requests were emitted by local preview.
-- TypeScript, ESLint, Prettier and workflow YAML validation passed.
-- Production web and iOS Hermes exports passed with the local flag deliberately enabled. Both bundles passed fixture-exclusion checks.
-- Connected iOS configuration includes Phone Number in its privacy manifest; no new system permission or capability was added.
-- Real SMS delivery and a fresh native signed archive were not tested. Hosted phone/Apple/Google providers remain disabled. Existing native archive evidence predates this change.
-- A one-time removal reminder is scheduled for October 2, 2026 at 10 AM America/New_York; the next-upload removal checklist above remains the release handoff.
+- TypeScript and ESLint pass; **191 unit tests in 22 files** pass, including Expo Go/Release boundary guards, US normalization, native marker restoration, sign-out, optional storage failure, provider handoff guards and real server OTP verification.
+- **Three phone browser journeys pass**: wrong number/code, bare US input, resend, changing international numbers, back navigation, reload, logout, unavailable providers and no stray text-node errors. No Supabase requests are emitted by phone preview.
+- **Expo Go 57.0.9, iPhone 17 simulator / iOS 27:** bare US number reaches verification; wrong code rejected; immediate resend clears it; `000000` opens the native map. A full Expo Go restart restores the test session. Profile opens, sign-out returns to welcome, incomplete numbers show guidance, and number correction can retry immediately.
+- Production web and iOS Hermes exports pass with **both preview flags deliberately enabled**. Both bundles pass fixture-exclusion checks. No dependency upgrade was needed.
+- Simulator validation does not replace testing on the owner's physical iPhone. No signed archive, real SMS delivery, real Google/Apple session, upload, paid service or hosted-auth change was performed in this fix.

@@ -5,9 +5,12 @@ export interface PhoneAuth {
   verify(phone: string, code: string): Promise<void>;
 }
 
-/** Accept common formatting, require an explicit international country code. */
+/** Bare 10-digit numbers default to the US; explicit international numbers are preserved. */
 export function normalizePhone(value: string): string | null {
   const phone = value.trim().replace(/[\s().-]/g, '');
+  if (/^\d{10}$/.test(phone)) return `+1${phone}`;
+  if (/^1\d{10}$/.test(phone)) return `+${phone}`;
+  if (phone.startsWith('+1') && phone.length !== 12) return null;
   return /^\+[1-9]\d{6,14}$/.test(phone) ? phone : null;
 }
 
@@ -18,7 +21,7 @@ function message(issue: unknown, verifying: boolean) {
     code === 'provider_disabled' ||
     code === 'sms_send_failed'
   )
-    return 'SMS sign-in isn’t available right now. Try email, Apple or Google, or try again later.';
+    return 'SMS sign-in isn’t available for this Zuno beta yet. Go back to choose another sign-in method.';
   if (code === 'over_sms_send_rate_limit' || code === 'over_request_rate_limit')
     return 'Too many attempts. Please wait a minute before trying again.';
   return verifying
@@ -29,7 +32,9 @@ function message(issue: unknown, verifying: boolean) {
 export async function requestPhoneCode(client: SupabaseClient, value: string) {
   const phone = normalizePhone(value);
   if (!phone)
-    throw new Error('Enter your phone number with its country code, such as +1 202 555 0123.');
+    throw new Error(
+      'Enter a 10-digit US phone number, or an international number with its country code.',
+    );
   try {
     const { error } = await client.auth.signInWithOtp({
       phone,

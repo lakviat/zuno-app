@@ -30,7 +30,7 @@ import {
 import { pickAvatar } from '../../backend/avatarUpload';
 import { useAvatarUrl } from '../../backend/useAvatarUrl';
 import { useAccount, backendConfig, supabase } from './AccountProvider';
-import { localPhonePreviewEnabled } from '../../backend/client';
+import { phonePreviewEnabled, expoGo } from '../../backend/client';
 const colors = palette.light;
 function Copy({ children, title = false }: PropsWithChildren<{ title?: boolean }>) {
   return <Text style={title ? styles.title : styles.copy}>{children}</Text>;
@@ -88,7 +88,6 @@ function Frame({ children }: PropsWithChildren) {
 function Welcome({ phoneAuth, localHint }: { phoneAuth?: PhoneAuth; localHint?: string } = {}) {
   const account = useAccount();
   const [flow, setFlow] = useState<'welcome' | 'email' | 'phone'>('welcome'),
-    [localNotice, setLocalNotice] = useState(''),
     [email, setEmail] = useState(''),
     [sent, setSent] = useState(false),
     [resendAt, setResendAt] = useState(0),
@@ -105,13 +104,9 @@ function Welcome({ phoneAuth, localHint }: { phoneAuth?: PhoneAuth; localHint?: 
     return () => clearInterval(timer);
   }, [resendAt]);
   const emailFlow = flow === 'email';
+  const providersUnavailable = !!localHint || expoGo;
   const nativeSignIn = (provider: 'apple' | 'google' | 'email') => {
-    if (localHint) {
-      setLocalNotice(
-        'Use the iOS app for Apple, Google or email sign-in. This local preview tests phone signup with sample data.',
-      );
-      return;
-    }
+    if (providersUnavailable) return;
     if (provider === 'email') setFlow('email');
     else void account.signIn(provider);
   };
@@ -132,8 +127,7 @@ function Welcome({ phoneAuth, localHint }: { phoneAuth?: PhoneAuth; localHint?: 
     );
   return (
     <Frame>
-      {localHint && <Copy>{localHint}</Copy>}
-      {localNotice && <Copy>{localNotice}</Copy>}
+      {!!localHint && <Copy>{localHint}</Copy>}
       {!emailFlow && (
         <>
           <Copy title>Your people. A little closer.</Copy>
@@ -142,7 +136,7 @@ function Welcome({ phoneAuth, localHint }: { phoneAuth?: PhoneAuth; localHint?: 
       )}
       {!emailFlow ? (
         <>
-          {apple ? (
+          {apple && !providersUnavailable ? (
             <View
               pointerEvents={account.busy ? 'none' : 'auto'}
               style={{ opacity: account.busy ? 0.5 : 1 }}
@@ -156,19 +150,37 @@ function Welcome({ phoneAuth, localHint }: { phoneAuth?: PhoneAuth; localHint?: 
               />
             </View>
           ) : (
-            <Action quiet disabled={account.busy} onPress={() => nativeSignIn('apple')}>
+            <Action
+              quiet
+              disabled={account.busy || providersUnavailable}
+              onPress={() => nativeSignIn('apple')}
+            >
               Continue with Apple
             </Action>
           )}
-          <Action quiet disabled={account.busy} onPress={() => nativeSignIn('google')}>
+          <Action
+            quiet
+            disabled={account.busy || providersUnavailable}
+            onPress={() => nativeSignIn('google')}
+          >
             Continue with Google
           </Action>
-          <Action disabled={account.busy} onPress={() => nativeSignIn('email')}>
+          <Action
+            quiet={providersUnavailable}
+            disabled={account.busy || providersUnavailable}
+            onPress={() => nativeSignIn('email')}
+          >
             Continue with Email
           </Action>
           <Action disabled={account.busy} onPress={() => setFlow('phone')}>
             Continue with Phone
           </Action>
+          {providersUnavailable && (
+            <Copy>
+              Use Phone to test here. Apple, Google and email sign-in need the connected Zuno build
+              and provider setup.
+            </Copy>
+          )}
         </>
       ) : (
         <>
@@ -268,18 +280,24 @@ function PhoneSignIn({ auth, onBack, hint }: { auth: PhoneAuth; onBack(): void; 
     try {
       if (verify) await auth.verify(target, code);
       else {
-        // Also back off failed sends; repeated taps should not hammer an unavailable provider.
-        setResendAt(Date.now() + 60000);
-        setNow(Date.now());
         await auth.request(target);
         if (mounted.current) {
           setSentTo(target);
           setCode('');
+          setResendAt(hint ? 0 : Date.now() + 60000);
+          setNow(Date.now());
         }
       }
     } catch (issue) {
-      if (mounted.current)
-        setError(issue instanceof Error ? issue.message : 'Could not connect. Please try again.');
+      if (mounted.current) {
+        const message =
+          issue instanceof Error ? issue.message : 'Could not connect. Please try again.';
+        setError(message);
+        if (!verify && message.includes('Too many attempts')) {
+          setResendAt(Date.now() + 60000);
+          setNow(Date.now());
+        }
+      }
     } finally {
       working.current = false;
       if (mounted.current) setBusy(false);
@@ -288,7 +306,7 @@ function PhoneSignIn({ auth, onBack, hint }: { auth: PhoneAuth; onBack(): void; 
   return (
     <Frame>
       <Copy title>{sentTo ? 'Enter your code' : 'Your phone, your people.'}</Copy>
-      {hint && <Copy>{hint}</Copy>}
+      {!!hint && <Copy>{hint}</Copy>}
       {sentTo ? (
         <>
           <Copy>
@@ -314,7 +332,8 @@ function PhoneSignIn({ auth, onBack, hint }: { auth: PhoneAuth; onBack(): void; 
       ) : (
         <>
           <Copy>
-            Include your country code. New here or coming back? Use the same number to sign in.
+            Enter your 10-digit US phone number. No +1 needed. Use the same number when you come
+            back.
           </Copy>
           <Input
             label="Phone number"
@@ -325,12 +344,14 @@ function PhoneSignIn({ auth, onBack, hint }: { auth: PhoneAuth; onBack(): void; 
             textContentType="telephoneNumber"
             autoCorrect={false}
             maxLength={30}
-            placeholder="+1 202 555 0123"
+            placeholder="202-555-0123"
             editable={!busy}
             onSubmitEditing={() => void perform(false)}
           />
           {!!phone && !normalizePhone(phone) && (
-            <Copy>Start with + and your country code, then your phone number.</Copy>
+            <Copy>
+              Use 10 digits for a US number. For another country, start with + and its country code.
+            </Copy>
           )}
         </>
       )}
@@ -350,9 +371,11 @@ function PhoneSignIn({ auth, onBack, hint }: { auth: PhoneAuth; onBack(): void; 
             ? 'Resend code'
             : busy
               ? 'Sending…'
-              : 'Send code'}
+              : hint
+                ? 'Continue'
+                : 'Send code'}
       </Action>
-      {sentTo && (
+      {!!sentTo && (
         <Action
           quiet
           disabled={busy}
@@ -629,7 +652,7 @@ function Setup({ profile }: { profile: Onboarding }) {
 }
 export function AuthGate({ children }: PropsWithChildren) {
   const a = useAccount();
-  if (__DEV__ && localPhonePreviewEnabled) {
+  if (__DEV__ && phonePreviewEnabled) {
     // Keep the fixture module out of production bundles, including its credentials.
     const { LocalPhonePreview } =
       // eslint-disable-next-line @typescript-eslint/no-require-imports

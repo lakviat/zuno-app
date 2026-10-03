@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onSessionEnd } from '../backend/sessionLifecycle';
-import { localPhonePreviewEnabled } from '../backend/client';
+import { phonePreviewEnabled } from '../backend/client';
 import type { MapViewport } from '../utils/geo';
 import React, {
   createContext,
@@ -30,7 +30,7 @@ import {
 import { motionStore } from '../features/location/store';
 import { reducer, type Action } from './reducer';
 const defaultRepository =
-  __DEV__ && localPhonePreviewEnabled
+  __DEV__ && phonePreviewEnabled
     ? new MockSocialRepository('zuno.local-phone.data.v1', () => {
         const snapshot = createSeed();
         const me = snapshot.people.find((person) => person.user.id === snapshot.currentUserId)!;

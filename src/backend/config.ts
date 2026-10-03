@@ -4,22 +4,27 @@ export type BackendConfiguration =
   | { status: 'configured'; url: string; publishableKey: string };
 
 /** Explicit local preview only; never substitutes for real hosted authentication. */
-export function allowLocalPhonePreview({
+export function allowPhonePreview({
   development,
   platform,
   hostname,
   flag,
+  expoGo = false,
+  expoGoFlag,
 }: {
   development: boolean;
   platform: string;
   hostname: string;
   flag?: string;
+  expoGo?: boolean;
+  expoGoFlag?: string;
 }) {
   return (
     development &&
-    platform === 'web' &&
-    flag === '1' &&
-    ['localhost', '127.0.0.1', '[::1]'].includes(hostname)
+    ((platform === 'web' &&
+      flag === '1' &&
+      ['localhost', '127.0.0.1', '[::1]'].includes(hostname)) ||
+      (platform === 'ios' && expoGo && expoGoFlag === '1'))
   );
 }
 

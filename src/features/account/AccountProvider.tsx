@@ -14,7 +14,13 @@ import * as Browser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { parseAuthCallback, AUTH_REDIRECT } from '../../backend/authCallback';
-import { backendConfig, supabase, revokeLocalSession, beginSignIn } from '../../backend/client';
+import {
+  backendConfig,
+  supabase,
+  revokeLocalSession,
+  beginSignIn,
+  expoGo,
+} from '../../backend/client';
 import { requestPhoneCode, verifyPhoneCode, type PhoneAuth } from '../../backend/phoneAuth';
 import { endSessionServices } from '../../backend/sessionLifecycle';
 import { onboardingState, type Onboarding } from '../../backend/onboarding';
@@ -217,6 +223,12 @@ export function AccountProvider({ children }: PropsWithChildren) {
   }, []);
   const signIn = async (provider: 'apple' | 'google' | 'email', email?: string) => {
     const client = supabase;
+    if (expoGo) {
+      setError(
+        'Use Phone testing in Expo Go. This sign-in method needs the connected Zuno build and provider setup.',
+      );
+      return false;
+    }
     if (!client || working.current) return false;
     working.current = true;
     setBusy(true);

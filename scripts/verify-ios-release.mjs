@@ -50,7 +50,7 @@ for (const developmentOnly of [
   'Switch demo viewer',
   'Preview simulated movement (development)',
   'Try Noah to see what a non-friend',
-  'Local phone preview',
+  'Phone test mode',
   'zuno.local-phone.session.v1',
 ]) {
   assert(

@@ -1,20 +1,24 @@
 import 'react-native-url-polyfill/auto';
 import './crypto';
+import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { createClient, processLock } from '@supabase/supabase-js';
-import { allowLocalPhonePreview, backendConfiguration } from './config';
+import { allowPhonePreview, backendConfiguration } from './config';
 import { decodedSessionStorage, revocableSessionStorage } from './sessionStorage';
 
-export const localPhonePreviewEnabled =
+export const expoGo = Platform.OS !== 'web' && isRunningInExpoGo();
+export const phonePreviewEnabled =
   __DEV__ &&
-  allowLocalPhonePreview({
+  allowPhonePreview({
     development: __DEV__,
     platform: Platform.OS,
     hostname: typeof window !== 'undefined' ? (window.location?.hostname ?? '') : '',
     flag: process.env.EXPO_PUBLIC_LOCAL_PHONE_PREVIEW,
+    expoGo,
+    expoGoFlag: process.env.EXPO_PUBLIC_EXPO_GO_PHONE_PREVIEW,
   });
-export const backendConfig = localPhonePreviewEnabled
+export const backendConfig = phonePreviewEnabled
   ? { status: 'unconfigured' as const }
   : backendConfiguration(
       process.env.EXPO_PUBLIC_SUPABASE_URL,

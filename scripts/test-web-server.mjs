@@ -22,6 +22,7 @@ symlinkSync(path.join(root, 'node_modules'), path.join(stage, 'node_modules'), '
 const env = {
   ...process.env,
   EXPO_NO_DOTENV: '1',
+  EXPO_PUBLIC_EXPO_GO_PHONE_PREVIEW: '',
   EXPO_PUBLIC_SUPABASE_URL: '',
   EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: '',
   EXPO_PUBLIC_LOCAL_PHONE_PREVIEW: process.env.ZUNO_TEST_PHONE_PREVIEW === '1' ? '1' : '',

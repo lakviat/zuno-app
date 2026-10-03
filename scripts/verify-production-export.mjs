@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const roots = process.argv.slice(2);
 assert(roots.length, 'Provide at least one Expo production export directory');
-const forbidden = ['Local phone preview', 'zuno.local-phone.session.v1', 'six-zero test code'];
+const forbidden = ['Phone test mode', 'zuno.local-phone.session.v1', 'six-zero test code'];
 for (const root of roots) {
   let bundles = 0;
   function walk(dir) {

@@ -17,17 +17,19 @@ npm run ios:preview
 
 With valid Supabase configuration, sign in from the welcome screen on iOS, complete onboarding, then open the map. No demo world is uploaded or used as a fallback. With no configuration, an explicitly labeled local sample world remains available for development and browser regression tests; see [local-preview guide](docs/LOCAL_PREVIEW.md).
 
-### Temporary localhost phone preview
+### Temporary phone testing in Expo Go and localhost
 
-For browser-only sample testing, put `EXPO_PUBLIC_LOCAL_PHONE_PREVIEW=1` in ignored `.env.local`, run `npm start`, and open `http://localhost:8081`:
+For iOS Expo Go testing, put `EXPO_PUBLIC_EXPO_GO_PHONE_PREVIEW=1` in ignored `.env.local`, run `npx expo start --go --lan`, and scan the QR code on the same Wi-Fi. For browser testing, separately set `EXPO_PUBLIC_LOCAL_PHONE_PREVIEW=1` and open `http://localhost:8081`. Restart Expo after changing these flags.
 
 1. Choose **Continue with Phone** from the four-method welcome screen.
-2. Enter any international-format number, such as `+1 202 555 0123`.
-3. Enter **000000** (six zeros). No SMS is sent.
+2. Enter any ten-digit US number, such as `202-555-0123`, and press **Continue**. `+1` is optional; other countries still use their country code.
+3. Enter **000000** (six zeros) on the verification screen and press **Verify & continue**. No SMS is sent.
 
-This opens the **Local Explorer** sample profile. **Sign out of local preview** clears the tab session. Sample edits use a separate browser storage key; no phone number/code is stored and no Supabase account/session is created. Email/PIN test login has been removed. Other providers continue to use real authentication in the iOS app.
+This opens the **Local Explorer** sample profile. **Sign out of phone test** clears the preview session. Sample edits use a separate storage key; no phone number/code is stored and no Supabase account/session is created. The iOS preview session survives restarting Expo Go; the browser session lasts until sign-out or closing the tab. Resend and number correction are immediate in test mode.
 
-The bypass requires **all four**: development build, web platform, an exact loopback hostname, and the explicit flag. It cannot run on native iOS, a LAN hostname, TestFlight, or a production website. The entire fixture module is excluded from production bundles. Remove the flag and restart Expo to disable it. Remove the fixture before the next TestFlight upload; see [phone-auth setup and removal checklist](docs/PHONE_AUTH.md).
+The bypass requires development mode plus either iOS **Expo Go** and its explicit flag, or web on an exact loopback hostname and its separate flag. It cannot run in Zuno's own development client, standalone iOS, TestFlight, or a production website. CI checks that the fixture is absent from production bundles even with both flags enabled.
+
+Google/Apple/email are visibly unavailable in this test mode. This project's OAuth/email callback needs a Zuno build that owns `zuno://auth/callback`; hosted Google/Apple/SMS providers still require configuration. See [phone testing, provider limitations and removal checklist](docs/PHONE_AUTH.md). Remove the temporary fixture before the next TestFlight upload.
 
 ## Continuous integration
 

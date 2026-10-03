@@ -7,6 +7,7 @@ import { AccountProvider, useAccount } from './AccountProvider';
 import { onSessionEnd } from '../../backend/sessionLifecycle';
 const m = vi.hoisted(() => ({
   session: null as Session | null,
+  expoGo: false,
   listener: ((_event: string, _session: Session | null) => {}) as (
     event: string,
     session: Session | null,
@@ -49,6 +50,9 @@ vi.mock('expo-secure-store', () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'device-only',
 }));
 vi.mock('../../backend/client', () => ({
+  get expoGo() {
+    return m.expoGo;
+  },
   backendConfig: { status: 'configured' },
   revokeLocalSession: async () => {},
   beginSignIn: async () => {},
@@ -114,6 +118,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.clearAllMocks();
   m.session = null;
+  m.expoGo = false;
   m.rpc.mockImplementation(async (name: string) => ({
     data: name === 'zuno_onboarding_state' ? profile : null,
     error: null,
@@ -157,6 +162,20 @@ afterEach(async () => {
   if (tree) await act(async () => tree.unmount());
 });
 describe('central account lifecycle (mocked provider/device boundary)', () => {
+  it.each(['google', 'apple', 'email'] as const)(
+    'does not launch unsupported real %s sign-in inside Expo Go',
+    async (provider) => {
+      m.expoGo = true;
+      await mount();
+      await act(async () => {
+        await account.signIn(provider, 'person@example.com');
+      });
+      expect(account.error).toContain('Use Phone testing in Expo Go');
+      expect(m.oauth).not.toHaveBeenCalled();
+      expect(m.apple).not.toHaveBeenCalled();
+      expect(m.otp).not.toHaveBeenCalled();
+    },
+  );
   it('AUTH-01 captures the first Apple name without storing an Apple credential', async () => {
     await mount();
     await act(async () => {

@@ -24,6 +24,7 @@ jobs:
       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ''
       # Prove that even an accidentally enabled flag cannot ship the fixture.
       EXPO_PUBLIC_LOCAL_PHONE_PREVIEW: '1'
+      EXPO_PUBLIC_EXPO_GO_PHONE_PREVIEW: '1'
       ZUNO_BUILD_CHANNEL: testflight
       ZUNO_TEST_PORT: '8082'
     steps:

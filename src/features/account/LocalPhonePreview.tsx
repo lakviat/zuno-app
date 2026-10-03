@@ -1,84 +1,121 @@
-// Loaded only by the __DEV__, web, loopback, opt-in branch in AuthGate.
+// Loaded only by AuthGate's explicit development preview branch. Never hosted Auth.
 import { useEffect, useRef, useState, type PropsWithChildren, type ComponentType } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizePhone, type PhoneAuth } from '../../backend/phoneAuth';
 import { endSessionServices } from '../../backend/sessionLifecycle';
 import { palette, tokens } from '../../theme/tokens';
 
 const sessionKey = 'zuno.local-phone.session.v1';
 const hint =
-  'Local phone preview · use any number with a country code and code 000000. No SMS is sent. This opens sample data only.';
-function restored() {
-  try {
-    return window.sessionStorage.getItem(sessionKey) === 'signed-in';
-  } catch {
-    return false;
-  }
-}
+  'Phone test mode · enter any 10-digit US number, then 000000. No SMS is sent. This opens sample data only.';
+// A marker only: never persist the phone, verification code, or a Supabase token.
+const storage = {
+  async read() {
+    try {
+      return (
+        (Platform.OS === 'web'
+          ? window.sessionStorage.getItem(sessionKey)
+          : await AsyncStorage.getItem(sessionKey)) === 'signed-in'
+      );
+    } catch {
+      return false;
+    }
+  },
+  async write(signedIn: boolean) {
+    try {
+      if (Platform.OS === 'web') {
+        if (signedIn) window.sessionStorage.setItem(sessionKey, 'signed-in');
+        else window.sessionStorage.removeItem(sessionKey);
+      } else if (signedIn) await AsyncStorage.setItem(sessionKey, 'signed-in');
+      else await AsyncStorage.removeItem(sessionKey);
+    } catch {
+      /* Local sample mode can still run without persistent storage. */
+    }
+  },
+};
 export function LocalPhonePreview({
   children,
   Welcome,
 }: PropsWithChildren<{
   Welcome: ComponentType<{ phoneAuth: PhoneAuth; localHint: string }>;
 }>) {
-  const [signedIn, setSignedIn] = useState(restored);
+  const [ready, setReady] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
   const requested = useRef('');
   useEffect(() => {
-    // Retire the old email/PIN preview session and its sample profile.
-    try {
-      window.sessionStorage.removeItem('zuno.local-test.session.v1');
-      window.localStorage.removeItem('zuno.local-test.data.v1');
-    } catch {}
+    let alive = true;
+    void storage.read().then((restored) => {
+      if (alive) {
+        setSignedIn(restored);
+        setReady(true);
+      }
+    });
+    // Retire the old browser email/PIN preview only; never touch real auth storage.
+    if (Platform.OS === 'web') {
+      try {
+        window.sessionStorage.removeItem('zuno.local-test.session.v1');
+        window.localStorage.removeItem('zuno.local-test.data.v1');
+      } catch {}
+    }
+    return () => {
+      alive = false;
+    };
   }, []);
   const auth: PhoneAuth = {
     request: async (phone) => {
       const normalized = normalizePhone(phone);
-      if (!normalized) throw new Error('Include a valid country code and phone number.');
+      if (!normalized)
+        throw new Error('Enter a 10-digit US number, or include an international country code.');
       requested.current = normalized;
     },
     verify: async (phone, code) => {
       if (!requested.current || requested.current !== normalizePhone(phone) || code !== '000000')
-        throw new Error('For this local preview, enter the six-zero test code: 000000.');
-      try {
-        window.sessionStorage.setItem(sessionKey, 'signed-in');
-      } catch {}
-      // Never persist the phone/code or create a Supabase session.
+        throw new Error('For this phone test, enter the six-zero test code: 000000.');
+      await storage.write(true);
       requested.current = '';
       setSignedIn(true);
     },
   };
+  if (!ready)
+    return (
+      <SafeAreaView style={styles.loading}>
+        <ActivityIndicator accessibilityLabel="Opening phone preview" />
+      </SafeAreaView>
+    );
   if (!signedIn) return <Welcome phoneAuth={auth} localHint={hint} />;
   return (
     <View style={{ flex: 1 }}>
-      <View style={styles.banner}>
-        <Text style={styles.label}>Local phone preview · sample data</Text>
-        <Pressable
-          accessibilityRole="button"
-          style={styles.button}
-          onPress={() => {
-            endSessionServices();
-            try {
-              window.sessionStorage.removeItem(sessionKey);
-            } catch {}
-            requested.current = '';
-            setSignedIn(false);
-          }}
-        >
-          <Text style={styles.link}>Sign out of local preview</Text>
-        </Pressable>
-      </View>
       {children}
+      <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.footer}>
+        <View style={styles.banner}>
+          <Text style={styles.label}>Phone test mode · sample data</Text>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.button}
+            onPress={() => {
+              endSessionServices();
+              requested.current = '';
+              void storage.write(false).then(() => setSignedIn(false));
+            }}
+          >
+            <Text style={styles.link}>Sign out of phone test</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
 const styles = StyleSheet.create({
+  loading: { flex: 1, justifyContent: 'center', backgroundColor: palette.light.background },
+  footer: { backgroundColor: palette.light.accentSoft },
   banner: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    backgroundColor: palette.light.accentSoft,
   },
   label: { fontFamily: tokens.font.medium, color: palette.light.ink, fontSize: 12 },
   button: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },

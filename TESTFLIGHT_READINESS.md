@@ -2,7 +2,7 @@
 
 Updated October 1, 2026, for the requested **real multiuser backend** beta. Earlier local-preview findings are preserved in [the historical audit](docs/TESTFLIGHT_AUDIT_2026-10-01.md).
 
-Phone-auth update: four signup methods are implemented. The temporary localhost email/PIN fixture was replaced with a guarded phone preview; remove it before the next upload. See [SMS activation and removal checklist](docs/PHONE_AUTH.md). The earlier native archive evidence below predates this update; current phone UI validation is recorded in that checklist.
+Phone-auth update, October 2, 2026: the guarded phone test now works in iOS Expo Go as well as localhost, including ten-digit US input without `+1`. Other providers are visibly unavailable in Expo Go; real Google/Apple/SMS configuration is still pending. Remove the temporary fixture before the next upload. See [SMS activation, native validation and removal checklist](docs/PHONE_AUTH.md). The earlier native archive evidence below predates this update; current production web/iOS exports pass fixture-exclusion checks.
 
 ## Current Status
 
