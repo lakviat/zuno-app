@@ -59,9 +59,9 @@ Upstream RN Maps/SVG deprecations, SDK script output warnings and skipped App In
 
 ## Tests
 
-- **191 tests across 22 files PASS, rerun October 6:** existing domain/zoom/location behavior, Auth config/callback/Keychain, account SQL/RLS, social PostgreSQL/PostGIS policies/commands, cloud transport lifecycle/account isolation and phone OTP validation/onboarding. Three phone browser journeys passed in the preceding phone-auth milestone; they were not rerun for this signing-only change. See docs/PHONE_AUTH.md.
+- **191 tests across 22 files PASS, rerun October 6:** existing domain/zoom/location behavior, Auth config/callback/Keychain, account SQL/RLS, social PostgreSQL/PostGIS policies/commands, cloud transport lifecycle/account isolation and phone OTP validation/onboarding. The current GitHub Actions run also passed the browser suites and production-export boundary checks. See docs/PHONE_AUTH.md.
 - **11 real local Supabase integration checks PASS:** three authenticated accounts; actual Realtime inbox denial/delivery; private/friends/public; 25 mph from m/s; block while connected; coarse projection; stop/reconnect; persistent/idempotent private chat; concurrent final meetup seat and leave revocation; private Storage ownership; anonymous/raw-GPS denial. Final invalidation-only transport was retested. Zero disposable accounts remain. Cron is active.
-- **Prior browser checks PASS:** 11 existing social/map/zoom journeys and three phone signup/cooldown/session/logout journeys. These use Development-only local preview, not hosted authentication; not rerun for the October 6 signing-only changes.
+- **Browser checks PASS:** 11 existing social/map/zoom journeys and three phone signup/cooldown/session/logout journeys. These use Development-only local preview, not hosted authentication. Both suites also passed in the October 6 GitHub Actions run.
 - **67 hosted SQL/RLS assertions PASS:** 49 social + 18 onboarding, synthetic identities fully rolled back. Final schema comparison: 282 audited objects with zero differences. Real hosted email/OAuth/WebSocket/device acceptance remains separate.
 
 - TypeScript, ESLint and Expo dependency compatibility PASS. Prettier and `git diff --check` PASS. Final source and generated archive include the modern photo-picker fix.
