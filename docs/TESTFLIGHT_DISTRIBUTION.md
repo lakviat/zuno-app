@@ -1,8 +1,40 @@
 # Zuno — signed TestFlight distribution
 
-Updated October 1, 2026 (New York). This records the real distribution attempt and supersedes older statements that Apple login/upload were not authorized. TestFlight upload is authorized; public App Store submission/release and public beta links are not.
+Updated October 6, 2026 (New York). TestFlight upload is authorized; public App Store submission/release and public beta links are not.
 
-## Current checkpoint
+## October 6 current checkpoint
+
+- **Membership/signing resolved:** paid membership is active and App Store Connect is accessible. Xcode registered `app.zuno.mobile` on the verified owner's Team. Sign in with Apple is enabled for that App ID; push/background/associated-domain capabilities remain off.
+- **Version 0.1.0, build 3:** signed arm64 physical-iPhone Release build and artifact validation PASS. The build is installed on the paired iPhone 15 Pro Max and `devicectl` confirmed launch; the process remained running on a later inspection. This is a direct development-signed install, not a TestFlight install or an end-to-end acceptance test.
+- **Checks:** TypeScript, ESLint and 191 tests in 22 files PASS. Device artifact checks cover signatures/profile/Team, Apple entitlement, hosted backend configuration, callback, resources, privacy manifests and absence of the temporary phone fixture. No compiler/linker failure remains.
+- **Signed archive: PASS.** Verified artifact: `/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/Zuno-signed-20261006T155004839Z.xcarchive`. **App Store distribution export PASS** at `Export-build3/Zuno.ipa` in the same managed build root. The exported IPA also passed deep code-signature and production artifact checks; it has an App Store distribution profile, debugging disabled, Apple sign-in enabled and no APNs entitlement. Apple server validation/upload/processing remains unperformed because there is no Zuno app record yet.
+- **App record:** no Zuno record exists. Apple rejected the requested name “Zuno” because it is already in use. Owner was asked to choose “Zuno: Friends & Meetups”, “Zuno Social Map” or another unique name. Keep the icon display name Zuno, bundle ID `app.zuno.mobile`, English (U.S.), and proposed SKU `zuno-ios`. The existing DV Lottery Tracker app is unrelated and was not changed.
+- **Hosted authentication:** current read-only settings show email enabled and Apple/Google/phone disabled. The native Apple provider draft uses client ID `app.zuno.mobile`; saving is awaiting owner approval. Native Apple authentication does not need an OAuth client secret. Real Apple/email session, onboarding, restoration and logout still need physical acceptance. Google OAuth setup and SMS-provider setup remain unfinished; no paid service was created.
+- **Upload:** not performed. Name selection/app record, provider approval and export-compliance declaration are pending. Do not describe this as available in TestFlight.
+- **Legal/product:** public Terms/Privacy URLs are still absent. `ITSAppUsesNonExemptEncryption` remains unset pending the owner's declaration below. No legal answer was invented.
+
+### Changes in this attempt
+
+1. Incremented `app.config.ts` build number from 2 to 3.
+2. Added automatic device registration only to the explicit signed physical-device mode in `scripts/ios-distribution.mjs`. The first generic archive reached Apple but failed because the newly active Team had no registered device/profile. The signed device build then provisioned successfully.
+3. Set the verified owner Team in ignored `.env.local`; credentials and signing artifacts are not committed.
+4. Updated this status and `TESTFLIGHT_READINESS.md`. Existing application/backend behavior and schema were preserved.
+
+Current evidence is kept in ignored `release-artifacts/`: `testflight-build3-tests.log`, `testflight-build3-device.log`, `build3-device-verification.json`, `device-build3-install.json`, `device-build3-launch.json`, `device-build3-processes.json`, `build3-archive-verification.json`, `build3-export-verification.json`, `build3-distribution-signature-verification.json`, and `app-name-unavailable.png`. Native logs live in the managed build root below. IPA verification initially encountered Desktop/File Provider resource-fork metadata when extracted under the repository; extracting the unchanged IPA in the managed Library build root passed strict signature checks. Keep native artifacts outside Desktop/iCloud. Development phone testing remains confined to localhost/Expo Go and is absent from the signed Release artifact; its cleanup checklist remains in [PHONE_AUTH.md](PHONE_AUTH.md).
+
+### Next actions
+
+1. Obtain the unique store name, create the iOS App Store Connect record and record its ID. Do not alter the other app.
+2. Save the prepared native Apple-provider setting only after approval, verify it is enabled, and test the real flow on the installed iPhone. Keep all-zero OTP testing out of hosted authentication.
+3. Signed archive and local App Store distribution export are complete. Run Apple server validation/upload after creating the record. Review genuine Apple errors; missing vendor framework symbols must not be replaced with fake symbols.
+4. Obtain the owner's export-compliance declaration. The engineering crypto inventory and Apple links are below.
+5. Upload using normal App Store Connect distribution, not TestFlight Internal Only. Wait for processing/compliance, create/select **Zuno Internal Beta**, and add the eligible owner tester and build.
+6. Install through TestFlight and execute the physical checklist in `TESTFLIGHT_READINESS.md`. Owner sign-in and real GPS/network/multi-account tests cannot be substituted by unit tests or successful launch.
+7. Finish real Google/SMS and public legal/support information before testers depend on those features. External testers, public links and public App Store release require separate authorization.
+
+The October 1 notes below are historical evidence and configuration guidance. Their earlier membership and signing blockers were resolved on October 6 as described above.
+
+## October 1 historical checkpoint
 
 | Item                                                    | Verified state                                                                                                                                                                                                    |
 | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -46,7 +78,7 @@ npm run ios:archive:signed -- --device=<DEVICE_UDID>
 npm run ios:archive:signed
 ```
 
-The signed modes explicitly allow Xcode automatic provisioning using the already signed-in owner account. They require a ten-character Team ID and hosted backend configuration before invoking native tools. `latest-signed-archive.txt` is separate from the unsigned artifact pointer. Signed verification checks nested code signatures, expected Team/app identifier, profile expiry, Sign in with Apple and no APNs entitlement. A development-signed archive is normal before App Store distribution re-signing; this script does not claim Apple server validation or TestFlight eligibility.
+The signed modes explicitly allow Xcode automatic provisioning using the already signed-in owner account. Only the explicit `--device` mode additionally allows registration of that connected device. They require a ten-character Team ID and hosted backend configuration before invoking native tools. `latest-signed-archive.txt` is separate from the unsigned artifact pointer. Signed verification checks nested code signatures, expected Team/app identifier, profile expiry, Sign in with Apple and no APNs entitlement. A development-signed archive is normal before App Store distribution re-signing; this script does not claim Apple server validation or TestFlight eligibility.
 
 Managed workspace: `/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/source/ios/Zuno.xcworkspace`. Open this workspace, scheme Zuno. Do not use the stale generated repository `ios/` copy. Regeneration reads `app.config.ts`; do not make the only permanent configuration change in generated Xcode files.
 

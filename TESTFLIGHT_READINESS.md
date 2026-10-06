@@ -1,48 +1,51 @@
 # Zuno — TestFlight readiness
 
-Updated October 1, 2026, for the requested **real multiuser backend** beta. Earlier local-preview findings are preserved in [the historical audit](docs/TESTFLIGHT_AUDIT_2026-10-01.md).
+Updated October 6, 2026, for the requested **real multiuser backend** beta. Earlier local-preview findings are preserved in [the historical audit](docs/TESTFLIGHT_AUDIT_2026-10-01.md).
 
-Phone-auth update, October 2, 2026: the guarded phone test now works in iOS Expo Go as well as localhost, including ten-digit US input without `+1`. Other providers are visibly unavailable in Expo Go; real Google/Apple/SMS configuration is still pending. Remove the temporary fixture before the next upload. See [SMS activation, native validation and removal checklist](docs/PHONE_AUTH.md). The earlier native archive evidence below predates this update; current production web/iOS exports pass fixture-exclusion checks.
+Phone-auth update, October 2, 2026: the guarded phone test now works in iOS Expo Go as well as localhost, including ten-digit US input without `+1`. Other providers are visibly unavailable in Expo Go; real Google/Apple/SMS configuration is still pending. The October 6 signed Release/archive/distribution IPA all pass fixture-exclusion checks; the temporary fixture remains limited to Development. Remove the temporary fixture before the next upload as described below. See [SMS activation, native validation and removal checklist](docs/PHONE_AUTH.md). The earlier native archive evidence below predates this update; current production web/iOS exports pass fixture-exclusion checks.
 
 ## Current Status
 
 **READY FOR SIGNING** for engineering preparation. The unsigned Release archive passes and the hosted social/onboarding schema is deployed and verified. This is not certification of a fully accepted hosted beta: Apple/Google/SMS provider configuration, hosted email delivery, legal URLs and physical iPhone acceptance remain before distribution.
 
-For the current authorized distribution attempt, the owner refreshed Xcode sign-in. Xcode exposes only Personal Team, Developer enrollment is Pending, and App Store Connect says the account is not enabled. No signing certificates, upload, public app publication or paid service was performed. Source code has since been pushed to GitHub with owner authorization. See [current distribution status](docs/TESTFLIGHT_DISTRIBUTION.md). See [authentication architecture](AUTH_ONBOARDING_ARCHITECTURE.md) and [hosted validation](docs/HOSTED_BACKEND_VALIDATION.md).
+October 6 distribution checkpoint: paid Apple membership is active, App Store Connect is accessible, and automatic signing registered the existing bundle ID with Sign in with Apple. Build 3 passed signed physical-device Release validation and was installed/launched on the paired iPhone. This is a direct development-signed installation, not a TestFlight installation or complete physical acceptance. Apple rejected the new app record's name “Zuno” as already in use; a unique store name is awaiting the owner. Supabase Apple-provider enablement is also awaiting owner approval. See [current distribution status](docs/TESTFLIGHT_DISTRIBUTION.md) for archive/upload progress and remaining actions, [authentication architecture](AUTH_ONBOARDING_ARCHITECTURE.md) and [hosted validation](docs/HOSTED_BACKEND_VALIDATION.md).
 
 ## Project
 
-| Item                                         | Value                                                                                            |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Application target / shared scheme / product | Zuno / Zuno / Zuno.app                                                                           |
-| Display name                                 | Zuno                                                                                             |
-| Workspace                                    | Generated CocoaPods `Zuno.xcworkspace`; not the stale ignored repository `ios/` copy             |
-| Prepared workspace                           | `/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/source/ios/Zuno.xcworkspace` |
-| Configurations                               | Debug and Release; Archive uses Release                                                          |
-| Deployment target / devices                  | iOS 16.4; iPhone and iPad; arm64 device                                                          |
-| Bundle ID                                    | `app.zuno.mobile`, preserved; ownership/availability still requires the user's Team              |
-| Marketing version                            | 0.1.0 from package.json                                                                          |
-| Build number                                 | 2 from app.config.ts `ios.buildNumber`                                                           |
-| Native/runtime                               | Xcode 27 / iOS 27 SDK; Swift 5 language mode; Expo 57.0.26 / RN 0.86.3 / Hermes                  |
-| Dependency managers / CI                     | npm and CocoaPods; no application SPM, Fastlane or CI workflow; EAS profiles unused              |
-| Signing                                      | Automatic signing prepared; no Team or certificate/profile hard-coded                            |
+| Item                                         | Value                                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Application target / shared scheme / product | Zuno / Zuno / Zuno.app                                                                                       |
+| Display name                                 | Zuno                                                                                                         |
+| Workspace                                    | Generated CocoaPods `Zuno.xcworkspace`; not the stale ignored repository `ios/` copy                         |
+| Prepared workspace                           | `/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/source/ios/Zuno.xcworkspace`             |
+| Configurations                               | Debug and Release; Archive uses Release                                                                      |
+| Deployment target / devices                  | iOS 16.4; iPhone and iPad; arm64 device                                                                      |
+| Bundle ID                                    | `app.zuno.mobile`, registered to the verified paid Team; preserved                                           |
+| Marketing version                            | 0.1.0 from package.json                                                                                      |
+| Build number                                 | 3 from app.config.ts `ios.buildNumber`                                                                       |
+| Native/runtime                               | Xcode 27 / iOS 27 SDK; Swift 5 language mode; Expo 57.0.26 / RN 0.86.3 / Hermes                              |
+| Dependency managers / CI                     | npm and CocoaPods; `.github/workflows/build.yml` validates tests and production exports; EAS profiles unused |
+| Signing                                      | Automatic signing verified; owner's Team loaded from ignored local configuration; no credentials committed   |
 
 Before each new TestFlight upload increment `ios.buildNumber` in `app.config.ts`, then prepare and archive again. For a new marketing version use `npm version <version> --no-git-tag-version`. If the bundle ID must change, update `ios.bundleIdentifier`, regenerate, and use the identical ID in Developer/App Store Connect. Recheck app container/Keychain and deep-link behavior; `zuno://auth/callback` remains the configured scheme callback.
 
 ## Build Results
 
-| Check                                     | Result                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------ |
-| Debug simulator                           | Prior baseline PASS; not repeated for this backend milestone                   |
-| Release generic iPhone / unsigned archive | PASS; verified final arm64 device archive                                      |
-| Release simulator                         | PASS; final build installed/launched on iPhone 17 / iOS 27                     |
-| Signed archive / Apple validation         | BLOCKED by absent Developer Team, signing and App Store Connect; not attempted |
+| Check                                     | Result                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------- |
+| Debug simulator                           | Prior baseline PASS; not repeated for this backend milestone      |
+| Release generic iPhone / unsigned archive | PASS; verified final arm64 device archive                         |
+| Release simulator                         | PASS; final build installed/launched on iPhone 17 / iOS 27        |
+| Signed physical iPhone Release            | PASS, build 3; installed and launched on paired iPhone 15 Pro Max |
+| Signed archive                            | PASS, build 3; signatures and production artifact checks passed   |
+| App Store export                          | PASS, build 3; distribution IPA and signatures verified           |
+| Upload / processing                       | NOT PERFORMED; unique app name/record and owner responses pending |
 
-Final verified artifact:
+Current verified signed artifact:
 
-`/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/Zuno-unsigned-build2-xcode-environment.xcarchive`
+`/Users/nurlanmirovich/Library/Developer/Zuno/TestFlight-60d5288d0b/Zuno-signed-20261006T155004839Z.xcarchive`
 
-Final simulator product:
+Prior simulator product (historical evidence, not physical-device acceptance):
 
 `/var/folders/j3/p_5qjxb96nd193wxm0fwb2th0000gn/T/zuno-ios-60d5288d0b/DerivedData/Build/Products/Release-iphonesimulator/Zuno.app`
 
@@ -56,9 +59,9 @@ Upstream RN Maps/SVG deprecations, SDK script output warnings and skipped App In
 
 ## Tests
 
-- **171 tests across 21 files PASS (phone-auth update):** existing domain/zoom/location behavior, Auth config/callback/Keychain, account SQL/RLS, social PostgreSQL/PostGIS policies/commands, cloud transport lifecycle/account isolation and phone OTP validation/onboarding. Two additional localhost phone browser journeys pass; see docs/PHONE_AUTH.md.
+- **191 tests across 22 files PASS, rerun October 6:** existing domain/zoom/location behavior, Auth config/callback/Keychain, account SQL/RLS, social PostgreSQL/PostGIS policies/commands, cloud transport lifecycle/account isolation and phone OTP validation/onboarding. Three phone browser journeys passed in the preceding phone-auth milestone; they were not rerun for this signing-only change. See docs/PHONE_AUTH.md.
 - **11 real local Supabase integration checks PASS:** three authenticated accounts; actual Realtime inbox denial/delivery; private/friends/public; 25 mph from m/s; block while connected; coarse projection; stop/reconnect; persistent/idempotent private chat; concurrent final meetup seat and leave revocation; private Storage ownership; anonymous/raw-GPS denial. Final invalidation-only transport was retested. Zero disposable accounts remain. Cron is active.
-- **13 browser journeys PASS (phone-auth update):** all 11 existing social/map/zoom journeys passed together; both new phone signup/cooldown/session/logout journeys passed. These use Development-only local preview, not hosted authentication.
+- **Prior browser checks PASS:** 11 existing social/map/zoom journeys and three phone signup/cooldown/session/logout journeys. These use Development-only local preview, not hosted authentication; not rerun for the October 6 signing-only changes.
 - **67 hosted SQL/RLS assertions PASS:** 49 social + 18 onboarding, synthetic identities fully rolled back. Final schema comparison: 282 audited objects with zero differences. Real hosted email/OAuth/WebSocket/device acceptance remains separate.
 
 - TypeScript, ESLint and Expo dependency compatibility PASS. Prettier and `git diff --check` PASS. Final source and generated archive include the modern photo-picker fix.
@@ -120,7 +123,7 @@ Location usage text: “Zuno uses your location while open to show nearby people
 
 ## Capabilities
 
-Foreground Core Location and MapKit display need no extra portal capability. SecureStore uses the app's standard Keychain access; no Keychain Sharing group. Custom URL scheme `zuno` is configured. Sign in with Apple is now implemented and its entitlement is prepared; enable the capability for the owner App ID and regenerate provisioning. No Background Modes, APNs, Associated Domains, App Groups, iCloud or Maps routing-provider entitlement is enabled. Notification permission code is gated while push delivery is absent.
+Foreground Core Location and MapKit display need no extra portal capability. SecureStore uses the app's standard Keychain access; no Keychain Sharing group. Custom URL scheme `zuno` is configured. Sign in with Apple is implemented, enabled for the registered App ID, and present in the verified signed app/profile. Hosted provider activation and real sign-in acceptance remain separate. No Background Modes, APNs, Associated Domains, App Groups, iCloud or Maps routing-provider entitlement is enabled. Notification permission code is gated while push delivery is absent.
 
 ## Privacy
 
@@ -152,10 +155,10 @@ Existing icon generates an opaque 1024px AppIcon and compiles; launch image is w
 ## Apple Developer Steps Remaining
 
 1. Complete provider/SMTP configuration and hosted three-account acceptance in SUPABASE_SETUP.md; the database deployment is already verified.
-2. Enroll/sign in to Apple Developer yourself; complete agreements and select your Team. Never share an Apple ID password here.
-3. Confirm `app.zuno.mobile` belongs to/is available for that Team; register the explicit App ID if necessary. Enable only the capabilities listed above.
-4. Prepare final source/version, open the generated workspace, select target Zuno and automatic signing/Team. Allow Xcode to manage certificates/profiles in Keychain.
-5. Create/connect the App Store Connect iOS app record with that bundle ID, display name, primary language and a SKU you choose; verify upload/testing roles.
+2. Membership, owner Xcode sign-in and paid Team selection were completed and verified October 6. Handle any future password/2FA prompt directly; never share an Apple ID password here.
+3. The existing `app.zuno.mobile` App ID is registered to that Team with Sign in with Apple. No further capability is currently needed.
+4. Build 3 has a successful signed device Release build and archive. Keep using the generated workspace and owner automatic signing; preserve credentials in Keychain/ignored configuration.
+5. Choose an available App Store/TestFlight name because Apple rejected “Zuno”. Create the iOS record with the existing bundle ID, English (U.S.) and SKU `zuno-ios`; keep the app icon name Zuno.
 6. Supply beta description, feedback/support/contact and privacy information, accurate App Store privacy and export-compliance answers, and reviewer sign-in instructions. Configure a working tester/reviewer email path; public email delivery is not assumed.
 7. Validate on signed physical iPhones with multiple accounts using the checklist below.
 8. Increment build number if previously uploaded, regenerate if needed, select generic iOS device and Archive with Release and normal signing (no CODE_SIGNING_ALLOWED=NO).
@@ -182,7 +185,7 @@ Existing icon generates an opaque 1024px AppIcon and compiles; launch image is w
 | Category         | Remaining work                                                                                                                                                                                                                                                         |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | CODE             | No known compiler, unit-test or archive blocker. Physical-device and hosted acceptance remain unverified; do not equate local tests with a production-scale certification.                                                                                             |
-| APPLE ACCOUNT    | Enrollment/agreements, Team/App ID, signing/provisioning, App Store Connect record/metadata, signed archive/upload/processing/TestFlight groups.                                                                                                                       |
+| APPLE ACCOUNT    | Paid membership, Team/App ID and device signing are resolved. Remaining: App Store Connect record/metadata, distribution validation/upload/processing and TestFlight group/testing.                                                                                    |
 | PRODUCT DECISION | Tester email delivery/audience; privacy/support/contact and moderation process; confirm foreground-only early beta limits, bundle ID ownership and iPad scope; export-compliance answers.                                                                              |
 | BACKEND          | Deployment complete; public channels disabled; 67 hosted assertions and 282-object catalog comparison passed. Remaining: Apple/Google provider configuration, SMTP for non-team addresses, real hosted email/WebSocket/Storage sessions with owner-controlled testers. |
 | ASSET            | No native-build blocker; final marketing screenshots and owner review remain.                                                                                                                                                                                          |

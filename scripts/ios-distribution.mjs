@@ -161,6 +161,7 @@ if (!prepareOnly) {
       ...(signed
         ? [
             '-allowProvisioningUpdates',
+            ...(device ? ['-allowProvisioningDeviceRegistration'] : []),
             `DEVELOPMENT_TEAM=${env.ZUNO_APPLE_TEAM_ID}`,
             'CODE_SIGN_STYLE=Automatic',
           ]
