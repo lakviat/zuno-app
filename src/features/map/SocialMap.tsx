@@ -8,7 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import MapView, { Marker, type Region } from 'react-native-maps';
+import MapView, { Marker, Polyline, type Region } from 'react-native-maps';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Txt } from '../../components/ui';
 import { useTheme } from '../../state/AppContext';
@@ -17,9 +17,9 @@ import { NativePersonMarker } from './NativePersonMarker';
 import { longitudeOffset } from '../../utils/geo';
 import { MIN_ZOOM, MAX_ZOOM } from './zoom';
 import { createNativeCamera } from './nativeCamera';
-import { APPLE_MIN_ALTITUDE, APPLE_MAX_ALTITUDE, globeViewportHeight } from './appleCamera';
+import { APPLE_MIN_ALTITUDE, APPLE_MAX_ALTITUDE } from './appleCamera';
 import { clusterMeetups } from './meetupClusters';
-import { clusterPeople } from './clusters';
+import { layoutPeople } from './peopleLayout';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
 
 export const SocialMap = React.memo(
@@ -28,13 +28,6 @@ export const SocialMap = React.memo(
     const { width, height } = useWindowDimensions();
     const { colors } = useTheme();
     const [mapReady, setMapReady] = useState(false);
-    const [globe, setGlobe] = useState(false);
-    const [fittedHeight, setFittedHeight] = useState(height);
-    const viewportHeight = globe ? fittedHeight : height;
-    const dimensions = useRef({ width, height });
-    useLayoutEffect(() => {
-      dimensions.current = { width, height };
-    }, [width, height]);
     const settledTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const callbacks = useRef(props);
     useLayoutEffect(() => {
@@ -51,8 +44,8 @@ export const SocialMap = React.memo(
       longitudeDelta: 0.05,
     });
     const regionRef = useRef(region);
-    const lastFit = useRef(height);
     const nativeMoving = useRef(false);
+    const [moving, setMoving] = useState(false);
     const zoom = useMemo(
       () =>
         createNativeCamera({
@@ -62,15 +55,6 @@ export const SocialMap = React.memo(
             return map.current.getCamera();
           },
           apply: (camera) => map.current?.setCamera(camera),
-          onGlobeChange: setGlobe,
-          onAltitudeChange: (altitude) => {
-            const d = dimensions.current;
-            const fit = globeViewportHeight(altitude, d.width, d.height);
-            if (lastFit.current !== fit) {
-              lastFit.current = fit;
-              setFittedHeight(fit);
-            }
-          },
         }),
       [],
     );
@@ -81,12 +65,11 @@ export const SocialMap = React.memo(
       },
       [zoom],
     );
-    useLayoutEffect(() => zoom.presentationReady(globe), [globe, viewportHeight, zoom]);
     const publishSettled = useCallback(() => {
       clearTimeout(settledTimer.current);
       settledTimer.current = setTimeout(() => {
         if (zoom.isActive()) return;
-        setRegion(regionRef.current);
+        setRegion({ ...regionRef.current });
         callbacks.current.onViewportChange?.(regionRef.current);
         zoom.settled();
       }, 180);
@@ -106,6 +89,7 @@ export const SocialMap = React.memo(
         },
         beginZoom: () => {
           clearTimeout(settledTimer.current);
+          setMoving(true);
           callbacks.current.onMoving?.();
           zoom.begin();
         },
@@ -117,28 +101,52 @@ export const SocialMap = React.memo(
       }),
       [zoom, publishSettled],
     );
-    // The native viewport region provides a local screen approximation for clustering.
-    // Provider-specific projection can replace this for globe/pitched views later.
-    const clusters = useMemo(
+    const people = useMemo(
       () =>
-        clusterPeople(
-          props.people.flatMap((person) => {
-            const c = person.location?.coordinate;
-            return c
-              ? [
-                  {
-                    person,
-                    x:
-                      (longitudeOffset(c.longitude, region.longitude) / region.longitudeDelta) *
-                      width,
-                    y: ((region.latitude - c.latitude) / region.latitudeDelta) * height,
-                  },
-                ]
-              : [];
-          }),
+        [...props.people.filter((p) => p.user.id !== props.me.user.id), props.me].filter(
+          (p) => p.location,
         ),
-      [props.people, region, width, height],
+      [props.people, props.me],
     );
+    const compactPeople = width < 720 || region.latitudeDelta > 0.1;
+    const [offsets, setOffsets] = useState<Record<string, { x: number; y: number }>>({});
+    const [connectors, setConnectors] = useState<
+      { id: string; coordinates: { latitude: number; longitude: number }[] }[]
+    >([]);
+    useEffect(() => {
+      let cancelled = false;
+      if (!mapReady || !map.current) return;
+      const nativeMap = map.current;
+      // Use MapKit's real projection. Offset overlapping avatars, never their saved GPS.
+      void Promise.all(
+        people.map(async (person) => {
+          const point = await nativeMap.pointForCoordinate(person.location!.coordinate);
+          return { person, ...point };
+        }),
+      )
+        .then(async (points) => {
+          const placed = layoutPeople(points, compactPeople);
+          const lines = await Promise.all(
+            placed
+              .filter((p) => p.offset.x || p.offset.y)
+              .map(async (p) => ({
+                id: p.person.user.id,
+                coordinates: [
+                  p.person.location!.coordinate,
+                  await nativeMap.coordinateForPoint({ x: p.x + p.offset.x, y: p.y + p.offset.y }),
+                ],
+              })),
+          );
+          if (cancelled || zoom.isActive() || nativeMoving.current) return;
+          setOffsets(Object.fromEntries(placed.map((p) => [p.person.user.id, p.offset])));
+          setConnectors(lines);
+          setMoving(false);
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }, [people, region, mapReady, compactPeople, width, height, zoom]);
     const meetupGroups = useMemo(
       () =>
         clusterMeetups(
@@ -157,28 +165,22 @@ export const SocialMap = React.memo(
       [props.meetups, region, width, height],
     );
     return (
-      <View style={[StyleSheet.absoluteFill, globe && { backgroundColor: '#000' }]}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#C4DFDD' }]}>
         <MapView
           ref={map}
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            height: viewportHeight,
-            top: (height - viewportHeight) / 2,
-          }}
+          style={StyleSheet.absoluteFill}
           initialRegion={region}
           // Apple Maps never emits onMapLoaded; its ready event starts native rendering.
           // Android still waits for tiles so a Google Maps authorization failure stays visible.
           onMapReady={() => {
             if (Platform.OS === 'ios') setMapReady(true);
-            zoom.ready();
           }}
           onMapLoaded={() => setMapReady(true)}
           onTouchStart={() => {
             clearTimeout(settledTimer.current);
             zoom.nativeGesture();
             nativeMoving.current = false;
+            setMoving(true);
             callbacks.current.onMoving?.();
           }}
           onTouchEnd={() => {
@@ -189,6 +191,7 @@ export const SocialMap = React.memo(
           }}
           onRegionChangeStart={() => {
             nativeMoving.current = true;
+            setMoving(true);
             clearTimeout(settledTimer.current);
           }}
           onLongPress={(event) => callbacks.current.onLongPress?.(event.nativeEvent.coordinate)}
@@ -197,7 +200,7 @@ export const SocialMap = React.memo(
             regionRef.current = next;
             publishSettled();
           }}
-          mapType={globe ? 'hybridFlyover' : Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
+          mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
           showsPointsOfInterests={false}
           showsBuildings={false}
           showsTraffic={false}
@@ -212,7 +215,7 @@ export const SocialMap = React.memo(
                 }
               : undefined
           }
-          userInterfaceStyle={props.dark ? 'dark' : 'light'}
+          userInterfaceStyle="light"
           rotateEnabled={false}
           pitchEnabled={false}
           toolbarEnabled={false}
@@ -221,61 +224,27 @@ export const SocialMap = React.memo(
           showsMyLocationButton={false}
           mapPadding={{ top: 85, bottom: 105, left: 12, right: 12 }}
         >
-          {clusters.map((cluster) => {
-            const person = cluster.people[0].person;
-            if (cluster.people.length === 1)
-              return (
-                <NativePersonMarker
-                  key={person.user.id}
-                  person={person}
-                  selected={props.selectedId === person.user.id}
-                  compact={width < 720 || region.latitudeDelta > 0.1}
-                  onSelect={props.onPersonPress}
-                />
-              );
-            const coordinate = {
-              latitude: region.latitude - (cluster.y / height) * region.latitudeDelta,
-              longitude: region.longitude + (cluster.x / width) * region.longitudeDelta,
-            };
-            return (
-              <Marker
-                key={cluster.id}
-                coordinate={coordinate}
-                accessibilityLabel={'Zoom into ' + cluster.people.length + ' people'}
-                centerOffset={region.latitudeDelta > 0.15 ? { x: -24, y: -20 } : undefined}
-                zIndex={2}
-                onPress={() => {
-                  zoom.nativeGesture();
-                  map.current?.animateToRegion(
-                    {
-                      ...coordinate,
-                      latitudeDelta: region.latitudeDelta / 2,
-                      longitudeDelta: region.longitudeDelta / 2,
-                    },
-                    0,
-                  );
-                }}
-              >
-                <View
-                  style={{
-                    width: 60,
-                    height: 60,
-                    backgroundColor: colors.surface,
-                    borderRadius: 32,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 3,
-                    borderColor: colors.accent,
-                  }}
-                >
-                  <Txt weight="display" style={{ fontSize: 24 }}>
-                    {cluster.people.length}
-                  </Txt>
-                  <Txt style={{ fontSize: 9 }}>people</Txt>
-                </View>
-              </Marker>
-            );
-          })}
+          {!moving &&
+            connectors.map((line) => (
+              <Polyline
+                key={line.id}
+                coordinates={line.coordinates}
+                strokeColor="#73867B"
+                strokeWidth={1.5}
+                lineDashPattern={[3, 3]}
+              />
+            ))}
+          {people.map((person) => (
+            <NativePersonMarker
+              now={props.now}
+              key={person.user.id}
+              person={person}
+              selected={person.user.id === props.me.user.id || props.selectedId === person.user.id}
+              compact={compactPeople}
+              offset={offsets[person.user.id]}
+              onSelect={props.onPersonPress}
+            />
+          ))}
           {meetupGroups.map((group) => {
             const multiple = group.meetups.length > 1;
             const onPress = () =>
@@ -301,9 +270,6 @@ export const SocialMap = React.memo(
               </Marker>
             );
           })}
-          {props.me.location && region.latitudeDelta <= 0.15 && (
-            <NativePersonMarker person={props.me} compact selected onSelect={props.onPersonPress} />
-          )}
         </MapView>
         {!mapReady && (
           <View

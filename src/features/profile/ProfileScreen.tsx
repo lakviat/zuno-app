@@ -1,3 +1,4 @@
+import { presenceText } from '../presence/presentation';
 import { AvatarUpload } from './AvatarUpload';
 import { useState } from 'react';
 import { View } from 'react-native';
@@ -112,7 +113,7 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
           }}
         >
           <Txt style={{ color: colors.green, fontSize: 12 }}>
-            {person.presence.emoji} {person.presence.status}
+            {presenceText(person.presence, now)}
           </Txt>
         </View>
         <Txt muted style={{ lineHeight: 22, textAlign: 'center', marginTop: 6 }}>

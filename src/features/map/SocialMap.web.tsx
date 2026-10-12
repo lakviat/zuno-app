@@ -6,16 +6,16 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Pressable, View, useWindowDimensions } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 import { Map as LibreMap, setWorkerUrl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Avatar, Txt } from '../../components/ui';
+import { Txt } from '../../components/ui';
 import { useTheme } from '../../state/AppContext';
 import { FriendMarker, MeetupMarker, MeetupClusterMarker } from './MapMarker';
 import { createZoomCamera } from './zoom';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { clusterMeetups } from './meetupClusters';
-import { clusterPeople } from './clusters';
+import { layoutPeople } from './peopleLayout';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
 
 export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMap(props, ref) {
@@ -29,7 +29,6 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
   const { colors } = useTheme();
   const callbacks = useRef(props);
   callbacks.current = props;
-  const dark = props.dark;
   const reduced = useReducedMotion();
   const zoom = useMemo(
     () =>
@@ -54,7 +53,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
     try {
       instance = new LibreMap({
         container: container.current,
-        style: `https://basemaps.cartocdn.com/gl/${dark ? 'dark-matter' : 'voyager'}-gl-style/style.json`,
+        style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
         center: [window.innerWidth < 720 ? -80.138 : MIAMI.longitude, MIAMI.latitude],
         zoom: window.innerWidth < 720 ? 12.65 : 13.25,
         minZoom: 3,
@@ -94,13 +93,12 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
       callbacks.current.onLongPress?.({ latitude: event.lngLat.lat, longitude: event.lngLat.lng }),
     );
     instance.on('load', () => {
-      if (!dark)
-        for (const layer of instance.getStyle().layers) {
-          if (layer.type === 'fill' && /water/.test(layer.id))
-            instance.setPaintProperty(layer.id, 'fill-color', '#BDDCD8');
-          if (layer.type === 'background')
-            instance.setPaintProperty(layer.id, 'background-color', '#F3F1E9');
-        }
+      for (const layer of instance.getStyle().layers) {
+        if (layer.type === 'fill' && /water/.test(layer.id))
+          instance.setPaintProperty(layer.id, 'fill-color', '#BDDCD8');
+        if (layer.type === 'background')
+          instance.setPaintProperty(layer.id, 'background-color', '#F3F1E9');
+      }
       publishViewport();
       setLoaded(true);
       setFailed(false);
@@ -121,7 +119,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
       instance.remove();
       map.current = null;
     };
-  }, [dark]);
+  }, []);
   useImperativeHandle(
     ref,
     () => ({
@@ -148,20 +146,22 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
   const project = (latitude: number, longitude: number) =>
     map.current?.project([longitude, latitude]);
   // frame is an intentional camera invalidation counter for geographic overlays.
-  const clusters =
+  const compactPeople = compact || (map.current?.getZoom() ?? 13) < 12;
+  const people =
     frame >= 0
-      ? clusterPeople(
-          props.people.flatMap((person) => {
-            const c = person.location?.coordinate;
-            const p = c && project(c.latitude, c.longitude);
-            return p ? [{ person, x: p.x, y: p.y }] : [];
-          }),
+      ? layoutPeople(
+          [...props.people.filter((p) => p.user.id !== props.me.user.id), props.me].flatMap(
+            (person) => {
+              const c = person.location?.coordinate;
+              const point = c && project(c.latitude, c.longitude);
+              return point ? [{ person, x: point.x, y: point.y }] : [];
+            },
+          ),
+          compactPeople,
         )
       : [];
-  const me = props.me.location?.coordinate;
-  const myPoint = me && project(me.latitude, me.longitude);
   return (
-    <View style={{ position: 'absolute', inset: 0, backgroundColor: colors.water }}>
+    <View style={{ position: 'absolute', inset: 0, backgroundColor: '#C4DFDD' }}>
       <div
         ref={container}
         style={{ position: 'absolute', inset: 0 }}
@@ -204,78 +204,53 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
               )}
             </View>
           ))}
-          {clusters.map((c) => (
-            <View key={c.id} style={{ position: 'absolute', left: c.x - 70, top: c.y - 72 }}>
-              {c.people.length === 1 ? (
-                <FriendMarker
-                  compact={compact}
-                  person={c.people[0].person}
-                  selected={props.selectedId === c.id}
-                  onPress={() => props.onPersonPress(c.id)}
-                />
-              ) : (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Zoom into ${c.people.length} friends`}
-                  onPress={() => {
-                    const m = map.current;
-                    if (m) {
-                      zoom.end();
-                      m.easeTo({
-                        center: m.unproject([c.x, c.y]),
-                        zoom: Math.min(18, m.getZoom() + 1.5),
-                        duration: reduced ? 0 : 350,
-                      });
-                    }
-                  }}
-                  style={{
-                    marginLeft: 42,
-                    width: 64,
-                    height: 64,
-                    backgroundColor: colors.surface,
-                    borderRadius: 36,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 3,
-                    borderColor: colors.accent,
-                  }}
-                >
-                  <Txt weight="display" style={{ fontSize: 24 }}>
-                    {c.people.length}
-                  </Txt>
-                  <Txt style={{ fontSize: 9 }}>friends</Txt>
-                </Pressable>
-              )}
-            </View>
-          ))}
-          {myPoint && (
+          <svg
+            aria-hidden="true"
+            width="100%"
+            height="100%"
+            style={{ position: 'absolute', pointerEvents: 'none' }}
+          >
+            {people
+              .filter((p) => p.offset.x || p.offset.y)
+              .map(({ person, x, y, offset }) => (
+                <g key={person.user.id}>
+                  <line
+                    x1={x}
+                    y1={y}
+                    x2={x + offset.x}
+                    y2={y + offset.y}
+                    stroke="#73867B"
+                    strokeWidth={1.5}
+                    strokeDasharray="3 3"
+                  />
+                  <circle cx={x} cy={y} r={2.5} fill="#73867B" />
+                </g>
+              ))}
+          </svg>
+          {people.map(({ person, x, y, offset }) => (
             <View
-              pointerEvents="none"
+              key={person.user.id}
               style={{
                 position: 'absolute',
-                left: myPoint.x - 28,
-                top: myPoint.y - 28,
-                alignItems: 'center',
+                left: x + offset.x - (compactPeople ? 36 : 70),
+                top: y + offset.y - (compactPeople ? 40 : 72),
+                zIndex:
+                  person.user.id === props.me.user.id || props.selectedId === person.user.id
+                    ? 2
+                    : 1,
               }}
             >
-              <View
-                style={{
-                  padding: 7,
-                  borderWidth: 2,
-                  borderColor: '#F26B5060',
-                  borderRadius: 45,
-                  backgroundColor: '#F26B5030',
-                }}
-              >
-                <View style={{ padding: 3, backgroundColor: colors.accent, borderRadius: 30 }}>
-                  <Avatar person={props.me} size={34} />
-                </View>
-              </View>
-              <Txt weight="bold" style={{ fontSize: 10, marginTop: 2, color: colors.accent }}>
-                you · demo
-              </Txt>
+              <FriendMarker
+                now={props.now}
+                compact={compactPeople}
+                person={person}
+                selected={
+                  person.user.id === props.me.user.id || props.selectedId === person.user.id
+                }
+                onPress={() => props.onPersonPress(person.user.id)}
+              />
             </View>
-          )}
+          ))}
         </View>
       )}
       {(!loaded || failed) && (

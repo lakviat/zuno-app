@@ -1,3 +1,4 @@
+import { presenceText } from '../features/presence/presentation';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Avatar, Icon, IconButton, Txt, ui, type IconName } from '../components/ui';
 import { Brand } from '../components/Brand';
@@ -185,7 +186,7 @@ export function WorldPanel({
                     {p.profile.displayName.split(' ')[0]}
                   </Txt>
                   <Txt muted style={{ fontSize: 10 }}>
-                    {p.presence.emoji} {p.presence.status}
+                    {presenceText(p.presence, now)}
                   </Txt>
                 </View>
                 <Icon name="arrow-up-right" size={15} color={colors.muted} />

@@ -13,6 +13,7 @@ export interface SocialMapProps {
   me: Person;
   meetups: Meetup[];
   dark: boolean;
+  now: number;
   onViewportChange?(viewport: MapViewport): void;
   onLongPress?(coordinate: Coordinate): void;
   onMoving?(): void;

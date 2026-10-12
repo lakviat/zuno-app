@@ -340,3 +340,36 @@ test('account entry explains sharing consent and configured sign-in availability
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Your profile', exact: true })).toBeVisible();
 });
+
+test('keeps individual people at wide zoom and persists activity badges on map and profile', async ({
+  page,
+}) => {
+  const me = page.getByRole('button', { name: 'Find Maya Chen', exact: true });
+  await expect(me).toBeVisible({ timeout: 25000 });
+  const initialPeople = await page.getByRole('button', { name: /^Find / }).count();
+  for (let i = 0; i < 14; i++)
+    await page.getByRole('button', { name: 'Zoom out', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^Find / })).toHaveCount(initialPeople);
+  for (const person of await page.getByRole('button', { name: /^Find / }).all())
+    await expect(person).toBeVisible();
+  await expect(page.getByRole('button', { name: /people together/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Recenter demo map' }).click();
+  await page.getByRole('button', { name: 'Set my availability', exact: true }).click();
+  await page.getByRole('button', { name: 'Maybe later', exact: true }).click();
+  await page.getByRole('button', { name: '🏋️ Gym', exact: true }).click();
+  await page.getByRole('button', { name: 'Set availability', exact: true }).click();
+  await expect(me.getByLabel('Maybe later · Gym', { exact: true })).toHaveText('🏋️');
+  await page.reload();
+  await expect(me).toBeVisible({ timeout: 25000 });
+  await expect(me.getByLabel('Maybe later · Gym', { exact: true })).toHaveText('🏋️');
+  await me.click();
+  await expect(page.getByText('🏋️ Maybe later · Gym', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Availability & intent', exact: true }).click();
+  await expect(
+    page.getByRole('textbox', { name: 'Your idea (optional)', exact: true }),
+  ).toHaveValue('🏋️ Gym');
+  await page.getByRole('button', { name: 'Busy', exact: true }).click();
+  await page.getByRole('button', { name: '🍸 Drinks', exact: true }).click();
+  await page.getByRole('button', { name: 'Set availability', exact: true }).click();
+  await expect(me.getByLabel('Busy · Drinks', { exact: true })).toHaveText('🍸');
+});

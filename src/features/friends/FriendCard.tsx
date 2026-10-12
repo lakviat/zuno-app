@@ -1,3 +1,4 @@
+import { presenceText } from '../presence/presentation';
 import { useEffect, useState } from 'react';
 import { Animated, View } from 'react-native';
 import { Avatar, Button, Icon, IconButton, Txt, ui } from '../../components/ui';
@@ -63,7 +64,7 @@ export function FriendCard({
             {person.profile.displayName.split(' ')[0]}
           </Txt>
           <Txt muted style={{ fontSize: 11 }}>
-            {person.presence.emoji} {person.presence.status}
+            {presenceText(person.presence, now)}
           </Txt>
         </View>
         <IconButton
@@ -92,7 +93,6 @@ export function FriendCard({
           {now - sample.timestamp < 90000 ? 'Updated now' : 'Last known'}
         </Txt>
       )}
-      {!!person.presence.intent && <Txt style={{ marginTop: 8 }}>{person.presence.intent}</Txt>}
       <View style={[ui.row, { gap: 8, marginTop: 18 }]}>
         <Button
           style={{ flex: 1 }}

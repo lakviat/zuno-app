@@ -1,3 +1,4 @@
+import { presenceText } from '../presence/presentation';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Avatar, Button, Chip, EmptyState, Field, Icon, Txt, ui } from '../../components/ui';
@@ -88,7 +89,7 @@ export function FriendsScreen({ navigate }: { navigate: Navigate }) {
               <Txt weight="bold">{person.profile.displayName}</Txt>
               <Txt muted style={{ fontSize: 12, marginTop: 5 }}>
                 {tab === 'Your friends'
-                  ? `${person.presence.emoji} ${person.presence.status}`
+                  ? presenceText(person.presence)
                   : `@${person.profile.username}`}
               </Txt>
             </Pressable>

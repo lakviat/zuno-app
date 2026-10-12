@@ -1,13 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Camera } from 'react-native-maps';
 import { createNativeCamera } from './nativeCamera';
-import {
-  APPLE_MAX_ALTITUDE,
-  appleAltitude,
-  appleZoom,
-  globeViewportHeight,
-  usesGlobe,
-} from './appleCamera';
+import { APPLE_MAX_ALTITUDE, appleAltitude, appleZoom } from './appleCamera';
 
 const initial: Camera = {
   center: { latitude: 25.7885, longitude: -80.141 },
@@ -21,12 +15,10 @@ const settle = async () => {
 function setup(read = vi.fn(async () => initial)) {
   let frame: (() => void) | undefined;
   const apply = vi.fn();
-  const onGlobeChange = vi.fn();
   const camera = createNativeCamera({
     apple: true,
     read,
     apply,
-    onGlobeChange,
     schedule: (callback) => {
       frame = callback;
       return 1;
@@ -39,7 +31,6 @@ function setup(read = vi.fn(async () => initial)) {
     camera,
     read,
     apply,
-    onGlobeChange,
     tick: () => {
       const callback = frame;
       frame = undefined;
@@ -48,20 +39,12 @@ function setup(read = vi.fn(async () => initial)) {
   };
 }
 
-describe('Apple globe camera', () => {
-  it('uses altitude at world scale and fits the whole globe on portrait and landscape screens', () => {
+describe('Apple map camera', () => {
+  it('uses altitude consistently from street to world scale', () => {
     for (const altitude of [100, 10_000, 600_000, APPLE_MAX_ALTITUDE]) {
       expect(appleAltitude(appleZoom(altitude))).toBeCloseTo(altitude);
     }
     expect(appleZoom(APPLE_MAX_ALTITUDE)).toBe(0);
-    expect(globeViewportHeight(4_000_000, 400, 900)).toBe(900);
-    expect(globeViewportHeight(APPLE_MAX_ALTITUDE, 400, 900)).toBe(400);
-    expect(globeViewportHeight(APPLE_MAX_ALTITUDE, 900, 400)).toBe(400);
-    expect(globeViewportHeight(8_000_000, 400, 900)).toBeLessThan(900);
-    expect(usesGlobe(500_000, false)).toBe(false);
-    expect(usesGlobe(600_000, false)).toBe(true);
-    expect(usesGlobe(500_000, true)).toBe(true);
-    expect(usesGlobe(300_000, true)).toBe(false);
   });
 
   it('commits a short drag whose native read arrives after release', async () => {
@@ -142,15 +125,13 @@ describe('Apple globe camera', () => {
     expect(apply.mock.calls.at(-1)?.[0].altitude).toBeCloseTo(40_000);
   });
 
-  it('waits for the globe renderer, then reverses immediately at the outer limit', async () => {
-    const { camera, apply, onGlobeChange, tick } = setup();
+  it('applies world zoom without switching renderers and reverses immediately at the outer limit', async () => {
+    const { camera, apply, tick } = setup();
     camera.begin();
     await settle();
     camera.update(-30);
     tick();
-    expect(onGlobeChange).toHaveBeenCalledWith(true);
-    expect(apply).not.toHaveBeenCalled();
-    camera.presentationReady(true);
+    expect(apply).toHaveBeenCalledOnce();
     expect(apply.mock.calls.at(-1)?.[0].altitude).toBe(APPLE_MAX_ALTITUDE);
     camera.update(-29);
     tick();
@@ -158,20 +139,19 @@ describe('Apple globe camera', () => {
     camera.end(true);
   });
 
-  it('does not apply a queued globe transition after a sheet cancels the gesture', async () => {
+  it('does not apply a queued camera frame after a sheet cancels the gesture', async () => {
     const { camera, apply, tick } = setup();
     camera.begin();
     await settle();
     camera.update(-30);
-    tick();
     camera.end();
-    camera.presentationReady(true);
+    tick();
     expect(apply).not.toHaveBeenCalled();
   });
 
   it('ignores native reads that resolve after unmount', async () => {
     let resolve!: (camera: Camera) => void;
-    const { camera, apply, onGlobeChange } = setup(
+    const { camera, apply } = setup(
       vi.fn(
         () =>
           new Promise<Camera>((r) => {
@@ -186,6 +166,5 @@ describe('Apple globe camera', () => {
     resolve(initial);
     await settle();
     expect(apply).not.toHaveBeenCalled();
-    expect(onGlobeChange).not.toHaveBeenCalled();
   });
 });

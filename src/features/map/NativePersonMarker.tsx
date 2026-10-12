@@ -1,6 +1,7 @@
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Marker } from 'react-native-maps';
-import { Animated } from 'react-native';
+import { Animated, Platform } from 'react-native';
+import { presencePresentation } from '../presence/presentation';
 import { FriendMarker } from './MapMarker';
 import { canInterpolate, type LocationSample } from '../location/motion';
 import { useMotion } from '../location/store';
@@ -11,13 +12,27 @@ export const NativePersonMarker = memo(function NativePersonMarker({
   person,
   compact,
   selected,
+  offset,
+  now,
   onSelect,
 }: {
   person: Person;
   compact: boolean;
   selected: boolean;
+  offset?: { x: number; y: number };
+  now: number;
   onSelect(id: string): void;
 }) {
+  // Apple custom views update directly. Google markers need a brief bitmap refresh
+  // when their artwork changes, not continuous view tracking while idle.
+  const display = presencePresentation(person.presence, now);
+  const [tracking, setTracking] = useState(Platform.OS !== 'ios');
+  useEffect(() => {
+    if (Platform.OS === 'ios') return;
+    setTracking(true);
+    const timer = setTimeout(() => setTracking(false), 750);
+    return () => clearTimeout(timer);
+  }, [display.emoji, display.status, person.profile.avatar, compact, selected]);
   const sample = useMotion(person.user.id, person.location?.precision === 'precise');
   const reduced = useReducedMotion();
   const origin = person.location!.coordinate;
@@ -59,10 +74,14 @@ export const NativePersonMarker = memo(function NativePersonMarker({
   return (
     <Marker.Animated
       coordinate={coordinate}
-      tracksViewChanges={false}
+      tracksViewChanges={tracking}
+      displayPriority="required"
+      centerOffset={offset}
+      zIndex={selected ? 5 : 4}
       onPress={() => onSelect(person.user.id)}
     >
       <FriendMarker
+        now={now}
         person={person}
         compact={compact}
         selected={selected}

@@ -1,3 +1,4 @@
+import { presenceText } from '../presence/presentation';
 import { OlderMessages } from './OlderMessages';
 import { canReadMeetupChat } from '../meetups/chatDomain';
 import { useEffect, useRef, useState } from 'react';
@@ -127,7 +128,7 @@ export function ChatScreen({ friendId, navigate }: { friendId?: string; navigate
   return (
     <Sheet
       title={person.profile.displayName.split(' ')[0]}
-      subtitle={`${person.presence.emoji} ${person.presence.status}`}
+      subtitle={presenceText(person.presence)}
       onClose={() => navigate({ name: 'map' })}
       back={() => navigate({ name: 'inbox' })}
       scroll={false}

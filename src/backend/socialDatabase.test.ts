@@ -1,3 +1,5 @@
+import { presencePresentation } from '../features/presence/presentation';
+import type { Person } from '../types/domain';
 import { readFileSync, readdirSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { postgis } from '@electric-sql/pglite-postgis';
@@ -122,6 +124,38 @@ describe('real Postgres + PostGIS social authorization', () => {
     await rpc('zuno_friend_action', [A, 'add']);
     await rpc('zuno_friend_action', [A, 'accept']);
     expect((await db.query('select * from public.zuno_friendships')).rows).toHaveLength(1);
+  });
+  it('returns saved activity badges to the owner and an authorized friend without exposing another private profile', async () => {
+    await db.exec('reset role; begin');
+    try {
+      for (const availability of ['free', 'later', 'busy']) {
+        await as(A);
+        await rpc('zuno_save_profile', [
+          'Alice',
+          'Hello',
+          'alice_zuno',
+          null,
+          'Original status',
+          availability,
+          '🏋️ Gym',
+        ]);
+        for (const viewer of [A, B]) {
+          await as(viewer);
+          const state = (await rpc('zuno_social_snapshot')) as { people: Person[] };
+          const alice = state.people.find((p) => p.user.id === A)!;
+          expect(alice.presence.intent).toBe('🏋️ Gym');
+          expect(presencePresentation(alice.presence)).toEqual({
+            emoji: '🏋️',
+            status: `${availability === 'free' ? 'Free now' : availability === 'later' ? 'Maybe later' : 'Busy'} · Gym`,
+          });
+        }
+      }
+      await as(C);
+      const hidden = (await rpc('zuno_social_snapshot')) as { people: Person[] };
+      expect(hidden.people.some((p) => p.user.id === A)).toBe(false);
+    } finally {
+      await db.exec('rollback; reset role');
+    }
   });
   it('public GPS is spatially bounded, measured speed persists, and only own inbox can subscribe', async () => {
     await as(B);

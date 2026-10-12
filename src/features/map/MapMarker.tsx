@@ -5,25 +5,30 @@ import { Avatar, Txt } from '../../components/ui';
 import { useTheme } from '../../state/AppContext';
 import { tokens } from '../../theme/tokens';
 import type { Person, Meetup } from '../../types/domain';
+import { presencePresentation } from '../presence/presentation';
 
 export const FriendMarker = memo(function FriendMarker({
   person,
   selected,
   onPress,
   compact = false,
+  now,
 }: {
   person: Person;
   selected?: boolean;
   onPress: () => void;
   compact?: boolean;
+  now?: number;
 }) {
   const { colors } = useTheme();
+  const presence = presencePresentation(person.presence, now);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Find ${person.profile.displayName}`}
+      accessibilityHint={`${presence.emoji} ${presence.status}`}
       onPress={onPress}
-      style={{ alignItems: 'center', width: 140, paddingBottom: 3 }}
+      style={{ alignItems: 'center', width: compact ? 72 : 140, paddingBottom: 3 }}
     >
       {!compact && (
         <View
@@ -37,7 +42,7 @@ export const FriendMarker = memo(function FriendMarker({
           }}
         >
           <Txt style={{ fontSize: 11 }} weight="medium">
-            {person.presence.status}
+            {presence.status}
           </Txt>
           <View
             style={{
@@ -81,7 +86,9 @@ export const FriendMarker = memo(function FriendMarker({
             alignItems: 'center',
           }}
         >
-          <Txt style={{ fontSize: 16 }}>{person.presence.emoji}</Txt>
+          <Txt style={{ fontSize: 16 }} accessibilityLabel={presence.status}>
+            {presence.emoji}
+          </Txt>
         </View>
       </View>
       <View
@@ -93,7 +100,7 @@ export const FriendMarker = memo(function FriendMarker({
           marginTop: 6,
         }}
       >
-        <Txt weight="bold" style={{ fontSize: 11 }}>
+        <Txt weight="bold" numberOfLines={1} style={{ fontSize: 11 }}>
           {person.profile.displayName.split(' ')[0]}
           {person.location?.precision === 'approximate' ? ' ≈' : ''}
         </Txt>

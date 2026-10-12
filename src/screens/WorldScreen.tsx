@@ -172,10 +172,14 @@ export function WorldScreen() {
   const selectPerson = useCallback(
     (id: string) => {
       map.current?.endZoom();
+      if (id === state.currentUserId) {
+        navigate({ name: 'profile' });
+        return;
+      }
       setSelected(id);
       if (filter === 'meetups') setFilter('all');
     },
-    [filter],
+    [filter, state.currentUserId, navigate],
   );
   if (!ready)
     return (
@@ -196,6 +200,7 @@ export function WorldScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={dark ? 'light' : 'dark'} />
       <SocialMap
+        now={now}
         ref={map}
         people={mapPeople}
         me={mapMe}
