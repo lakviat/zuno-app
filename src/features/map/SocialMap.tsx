@@ -17,16 +17,26 @@ import { NativePersonMarker } from './NativePersonMarker';
 import { longitudeOffset } from '../../utils/geo';
 import { MIN_ZOOM, MAX_ZOOM } from './zoom';
 import { createNativeCamera } from './nativeCamera';
-import { APPLE_MIN_ALTITUDE, APPLE_MAX_ALTITUDE } from './appleCamera';
+import { APPLE_MIN_ALTITUDE, APPLE_MAX_ALTITUDE, globeViewportHeight } from './appleCamera';
 import { clusterMeetups } from './meetupClusters';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
 
 export const SocialMap = React.memo(
   forwardRef<MapHandle, SocialMapProps>(function SocialMap(props, ref) {
     const map = useRef<MapView>(null);
-    const { width, height } = useWindowDimensions();
+    const window = useWindowDimensions();
+    const [size, setSize] = useState({ width: window.width, height: window.height });
+    const { width, height } = size;
+    const dimensions = useRef(size);
+    useLayoutEffect(() => {
+      dimensions.current = size;
+    }, [size]);
     const { colors } = useTheme();
     const [mapReady, setMapReady] = useState(false);
+    const [globe, setGlobe] = useState(false);
+    const [fittedHeight, setFittedHeight] = useState(height);
+    const viewportHeight = globe ? Math.min(height, fittedHeight) : height;
+    const lastAltitude = useRef(0);
     const settledTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const callbacks = useRef(props);
     useLayoutEffect(() => {
@@ -53,6 +63,12 @@ export const SocialMap = React.memo(
             return map.current.getCamera();
           },
           apply: (camera) => map.current?.setCamera(camera),
+          onGlobeChange: setGlobe,
+          onAltitudeChange: (altitude) => {
+            lastAltitude.current = altitude;
+            const d = dimensions.current;
+            setFittedHeight(globeViewportHeight(altitude, d.width, d.height));
+          },
         }),
       [],
     );
@@ -63,6 +79,10 @@ export const SocialMap = React.memo(
       },
       [zoom],
     );
+    useLayoutEffect(() => {
+      setFittedHeight(globeViewportHeight(lastAltitude.current, width, height));
+    }, [width, height]);
+    useLayoutEffect(() => zoom.presentationReady(globe), [globe, viewportHeight, zoom]);
     const publishSettled = useCallback(() => {
       clearTimeout(settledTimer.current);
       settledTimer.current = setTimeout(() => {
@@ -124,15 +144,33 @@ export const SocialMap = React.memo(
       [props.meetups, region, width, height],
     );
     return (
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#C4DFDD' }]}>
+      <View
+        style={[StyleSheet.absoluteFill, { backgroundColor: globe ? '#000000' : '#C4DFDD' }]}
+        onLayout={({ nativeEvent: { layout } }) => {
+          if (layout.width > 0 && layout.height > 0) {
+            setSize((previous) =>
+              previous.width === layout.width && previous.height === layout.height
+                ? previous
+                : { width: layout.width, height: layout.height },
+            );
+          }
+        }}
+      >
         <MapView
           ref={map}
-          style={StyleSheet.absoluteFill}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            height: viewportHeight,
+            top: (height - viewportHeight) / 2,
+          }}
           initialRegion={region}
           // Apple Maps never emits onMapLoaded; its ready event starts native rendering.
           // Android still waits for tiles so a Google Maps authorization failure stays visible.
           onMapReady={() => {
             if (Platform.OS === 'ios') setMapReady(true);
+            zoom.ready();
           }}
           onMapLoaded={() => setMapReady(true)}
           onTouchStart={() => {
@@ -157,7 +195,7 @@ export const SocialMap = React.memo(
             regionRef.current = next;
             publishSettled();
           }}
-          mapType={Platform.OS === 'ios' ? 'mutedStandard' : 'standard'}
+          mapType={Platform.OS === 'ios' ? (globe ? 'hybridFlyover' : 'mutedStandard') : 'standard'}
           showsPointsOfInterests={false}
           showsBuildings={false}
           showsTraffic={false}
