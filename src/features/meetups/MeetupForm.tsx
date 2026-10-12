@@ -7,7 +7,7 @@ import type { Navigate, Route } from '../../navigation/routes';
 import type { MeetupDraft, MeetupVisibility, MeetupPlace } from '../../types/domain';
 import { uid } from '../../utils/time';
 import { areFriends, blockedBetween, canManageMeetup, getAuthorizedMeetup } from './domain';
-import { activities, audienceLabels, meetupPlaces } from './places';
+import { activities, audienceLabels, defaultMeetupTitle, meetupPlaces } from './places';
 import { endAfterStartChange, localDateTime, localZone, toInstant, meetupTime } from './localTime';
 import { DateTimeField } from './DateTimeField';
 
@@ -25,7 +25,7 @@ export function MeetupForm({
   const { state, now, meetupViewerId, meetupAreaId, setMeetupAreaId, runMeetup, colors, notify } =
     useApp();
   const existing = meetupId ? getAuthorizedMeetup(state, meetupViewerId, meetupId) : undefined;
-  const [title, setTitle] = useState(existing?.title ?? '');
+  const [title, setTitle] = useState(existing?.title ?? defaultMeetupTitle('☕'));
   const [description, setDescription] = useState(existing?.description ?? '');
   const [emoji, setEmoji] = useState(existing?.emoji ?? '☕');
   const pinnedPlace = place ?? (existing?.place.kind === 'map-pin' ? existing.place : undefined);
@@ -79,7 +79,7 @@ export function MeetupForm({
   const save = async () => {
     Keyboard.dismiss();
     const draft: MeetupDraft = {
-      title,
+      title: title.trim() || defaultMeetupTitle(emoji),
       description,
       emoji,
       placeId,
@@ -168,7 +168,8 @@ export function MeetupForm({
                 accessibilityState={{ selected: a.emoji === emoji }}
                 onPress={() => {
                   setEmoji(a.emoji);
-                  if (!title.trim() && a.label !== 'Other') setTitle(`${a.label}, anyone?`);
+                  if (!title.trim() || title === defaultMeetupTitle(emoji))
+                    setTitle(defaultMeetupTitle(a.emoji));
                 }}
                 style={{
                   width: 68,
@@ -187,8 +188,8 @@ export function MeetupForm({
             ))}
           </ScrollView>
           <Field
-            label="Meetup title"
-            placeholder="Coffee & a catch-up"
+            label="Meetup title (optional)"
+            placeholder={defaultMeetupTitle(emoji)}
             value={title}
             onChangeText={setTitle}
             maxLength={60}

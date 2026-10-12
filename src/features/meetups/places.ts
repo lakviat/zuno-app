@@ -75,3 +75,10 @@ export const audienceLabels = {
   'invite-only': 'Invite-only',
   public: 'Public nearby',
 };
+
+/** Every meetup has a useful saved title, even when the optional input is cleared. */
+export function defaultMeetupTitle(emoji: string): string {
+  if (emoji === '☕') return 'Let’s go for a coffee';
+  const activity = activities.find((a) => a.emoji === emoji);
+  return activity && activity.label !== 'Other' ? `${activity.label}, anyone?` : 'Let’s hang out';
+}

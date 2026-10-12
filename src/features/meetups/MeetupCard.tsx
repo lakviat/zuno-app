@@ -8,7 +8,7 @@ import { meetupTime } from './localTime';
 export function MeetupCard({ meetup: m, onPress }: { meetup: Meetup; onPress(): void }) {
   const { colors, state, now, meetupViewerId } = useApp();
   const status = meetupStatus(m, now);
-  const host = state.people.find((p) => p.user.id === m.hostId)?.profile.displayName.split(' ')[0];
+  const host = state.people.find((p) => p.user.id === m.hostId);
   const participants = m.participantIds
     .filter((id) => !blockedBetween(state, meetupViewerId, id))
     .flatMap((id) => {
@@ -20,6 +20,7 @@ export function MeetupCard({ meetup: m, onPress }: { meetup: Meetup; onPress(): 
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`View ${m.title}`}
+      accessibilityHint={host ? `Hosted by ${host.profile.displayName}` : 'Host unavailable'}
       onPress={onPress}
       style={({ pressed }) => ({
         padding: 18,
@@ -52,8 +53,14 @@ export function MeetupCard({ meetup: m, onPress }: { meetup: Meetup; onPress(): 
         </View>
       </View>
       <Txt muted style={{ fontSize: 12 }}>
-        {meetupTime(m.startsAt)} · {host} hosts
+        {meetupTime(m.startsAt)}
       </Txt>
+      <View style={[ui.row, { gap: 9 }]}>
+        {host && <Avatar person={host} size={30} />}
+        <Txt weight="medium" style={{ flex: 1, fontSize: 12 }}>
+          {host ? `Hosted by ${host.profile.displayName}` : 'Host unavailable'}
+        </Txt>
+      </View>
       <View style={[ui.row, { gap: 7 }]}>
         <Icon name="map-pin" size={13} />
         <Txt muted style={{ fontSize: 12, flex: 1 }}>

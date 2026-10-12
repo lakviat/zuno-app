@@ -197,6 +197,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
                 <MeetupMarker
                   compact={compact}
                   meetup={group.meetups[0]}
+                  host={props.meetupHosts[group.meetups[0].hostId]}
                   onPress={() => props.onMeetupPress(group.meetups[0].id)}
                 />
               )}

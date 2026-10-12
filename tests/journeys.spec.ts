@@ -62,10 +62,11 @@ test('creates a public meetup, joins as a non-friend, persists, edits and cancel
   await page.getByRole('button', { name: 'Sunset Harbour', exact: true }).click();
   await page.getByRole('button', { name: 'Create a meetup', exact: true }).click();
   await page.getByRole('button', { name: 'Set meetup here', exact: true }).click();
-  await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Add a title');
+  await expect(
+    page.getByRole('textbox', { name: 'Meetup title (optional)', exact: true }),
+  ).toHaveValue('Let’s go for a coffee');
   await page
-    .getByRole('textbox', { name: 'Meetup title', exact: true })
+    .getByRole('textbox', { name: 'Meetup title (optional)', exact: true })
     .fill('A sunny afternoon walk');
   await page.getByRole('button', { name: 'Custom date/time', exact: true }).click();
   await page.getByLabel('Starts', { exact: true }).fill('2099-10-02T10:00');
@@ -152,23 +153,29 @@ test('meetup draft keeps its duration and requires an explicit discard', async (
   await page.getByRole('button', { name: 'South Beach', exact: true }).click();
   await page.getByRole('button', { name: 'Create a meetup', exact: true }).click();
   await page.getByRole('button', { name: 'Set meetup here', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Meetup title', exact: true }).fill('Draft to keep');
+  await page
+    .getByRole('textbox', { name: 'Meetup title (optional)', exact: true })
+    .fill('Draft to keep');
   await page.getByRole('button', { name: 'Custom date/time', exact: true }).click();
   await page.getByLabel('Starts', { exact: true }).fill('2099-10-02T23:30');
   await expect(page.getByLabel('Ends', { exact: true })).toHaveValue('2099-10-03T00:30');
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByText('Discard your unsaved changes?', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Keep editing' }).click();
-  await expect(page.getByRole('textbox', { name: 'Meetup title', exact: true })).toHaveValue(
-    'Draft to keep',
-  );
+  await expect(
+    page.getByRole('textbox', { name: 'Meetup title (optional)', exact: true }),
+  ).toHaveValue('Draft to keep');
   await page.getByRole('button', { name: 'Go back', exact: true }).click();
   await page.getByRole('button', { name: 'Discard changes' }).click();
   await expect(page.getByRole('button', { name: 'View Draft to keep' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Create a meetup', exact: true }).click();
   await page.getByRole('button', { name: 'Set meetup here', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Meetup title', exact: true })).toBeEmpty();
-  await page.getByRole('textbox', { name: 'Meetup title', exact: true }).fill('A park meetup');
+  await expect(
+    page.getByRole('textbox', { name: 'Meetup title (optional)', exact: true }),
+  ).toHaveValue('Let’s go for a coffee');
+  await page
+    .getByRole('textbox', { name: 'Meetup title (optional)', exact: true })
+    .fill('A park meetup');
   await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
   await expect(
     page
@@ -300,7 +307,9 @@ test('map-native Now meetup, group chat, availability and public discovery contr
   await page.mouse.move(200, 320, { steps: 12 });
   await page.mouse.up();
   await page.getByRole('button', { name: 'Set meetup here', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Meetup title', exact: true }).fill('Coffee right now');
+  await page
+    .getByRole('textbox', { name: 'Meetup title (optional)', exact: true })
+    .fill('Coffee right now');
   await page.getByRole('button', { name: 'Now', exact: true }).click();
   await page.getByRole('button', { name: 'Public nearby', exact: true }).click();
   await page.getByRole('button', { name: '4 people', exact: true }).click();
@@ -453,4 +462,49 @@ test('edits and persists About me and Instagram, rejects invalid links, and can 
   await page.getByLabel('Instagram (optional)', { exact: true }).fill('');
   await page.getByRole('button', { name: 'Save your changes', exact: true }).click();
   await expect(page.getByRole('button', { name: '@zuno_demo_test', exact: true })).toHaveCount(0);
+});
+
+test('optional meetup titles follow the activity, preserve custom text, and show the creator on map and details', async ({
+  page,
+}) => {
+  await expect(page.getByRole('button', { name: 'Find Maya Chen', exact: true })).toBeVisible({
+    timeout: 25000,
+  });
+  for (let i = 0; i < 4; i++)
+    await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await page.getByRole('button', { name: 'Create meetup on map', exact: true }).click();
+  await page.getByRole('button', { name: 'Set meetup here', exact: true }).click();
+  const title = page.getByRole('textbox', { name: 'Meetup title (optional)', exact: true });
+  await expect(title).toHaveValue('Let’s go for a coffee');
+  await page.getByRole('button', { name: 'Choose Drinks', exact: true }).click();
+  await expect(title).toHaveValue('Drinks, anyone?');
+  await title.fill('My own meetup idea');
+  await page.getByRole('button', { name: 'Choose Beach', exact: true }).click();
+  await expect(title).toHaveValue('My own meetup idea');
+  await page.getByRole('button', { name: 'Choose Coffee', exact: true }).click();
+  await title.fill('   ');
+  await page.getByRole('button', { name: 'Now', exact: true }).click();
+  await page.getByRole('button', { name: 'Create meetup', exact: true }).click();
+  await expect(
+    page.getByRole('dialog').getByText('Let’s go for a coffee', { exact: true }),
+  ).toBeVisible();
+  const host = page.getByRole('button', {
+    name: "View meetup host Maya Chen's profile",
+    exact: true,
+  });
+  await expect(host).toBeVisible();
+  await expect(host.getByRole('img', { name: 'Maya Chen', exact: true })).toBeVisible();
+  await host.click();
+  await expect(page.getByText('A little about you', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  const pin = page.getByRole('button', { name: 'Open meetup Let’s go for a coffee', exact: true });
+  await expect(pin).toBeVisible();
+  await expect(pin.getByText('By Maya Chen', { exact: true })).toBeVisible();
+  await expect(pin.getByRole('img', { name: 'Maya Chen', exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Meetups', exact: true }).click();
+  const card = page.getByRole('button', { name: 'View Let’s go for a coffee', exact: true });
+  await expect(card.getByText('Hosted by Maya Chen', { exact: true })).toBeVisible();
+  await card.click();
+  await expect(host).toBeVisible();
 });

@@ -12,6 +12,8 @@ export interface SocialMapProps {
   people: Person[];
   me: Person;
   meetups: Meetup[];
+  /** Authorized profile data, independent of whether the host shares a live location. */
+  meetupHosts: Record<string, Person | undefined>;
   dark: boolean;
   now: number;
   onViewportChange?(viewport: MapViewport): void;

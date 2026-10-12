@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Share, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
 import { Avatar, Button, EmptyState, Icon, Txt, ui } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { useApp } from '../../state/AppContext';
@@ -110,16 +110,27 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
               </Txt>
             )}
           </View>
-          {host && (
-            <View style={[ui.row, { gap: 12 }]}>
+          {host ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`View meetup host ${host.profile.displayName}'s profile`}
+              onPress={() => navigate({ name: 'profile', userId: host.user.id })}
+              style={[
+                ui.row,
+                { gap: 12, padding: 14, borderRadius: 18, backgroundColor: colors.raised },
+              ]}
+            >
               <Avatar person={host} size={40} />
-              <View>
+              <View style={{ flex: 1 }}>
                 <Txt weight="bold">Hosted by {host.profile.displayName}</Txt>
                 <Txt muted style={{ fontSize: 11 }}>
-                  {m.hostId === meetupViewerId ? 'You’re hosting' : 'Meetup host'}
+                  {m.hostId === meetupViewerId ? 'You’re hosting' : 'Meetup host · View profile'}
                 </Txt>
               </View>
-            </View>
+              <Icon name="chevron-right" size={18} />
+            </Pressable>
+          ) : (
+            <Txt muted>Host unavailable</Txt>
           )}
           <View style={{ padding: 18, backgroundColor: colors.raised, borderRadius: 20, gap: 16 }}>
             <View style={[ui.row, { gap: 12 }]}>
@@ -153,7 +164,11 @@ export function MeetupDetail({ meetupId, navigate }: { meetupId: string; navigat
             >
               Show on map
             </Button>
-            <Button kind="quiet" onPress={() => navigate({ name: 'profile', userId: m.hostId })}>
+            <Button
+              kind="quiet"
+              disabled={!host}
+              onPress={() => navigate({ name: 'profile', userId: m.hostId })}
+            >
               View host
             </Button>
             <Button

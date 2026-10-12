@@ -23,7 +23,12 @@ vi.mock('react-native-maps', async () => {
       React.useImperativeHandle(ref, () => m.nativeMap);
       return React.createElement('MapView', props, props.children);
     }),
-    Marker: Object.assign('Marker', { Animated: 'AnimatedMarker' }),
+    Marker: Object.assign(
+      function MockMarker(props: { children: React.ReactNode }) {
+        return React.createElement('Marker', props, props.children);
+      },
+      { Animated: 'AnimatedMarker' },
+    ),
     Polyline: 'Polyline',
   };
 });
@@ -78,6 +83,7 @@ beforeEach(async () => {
     people: state.people.slice(1),
     me: state.people[0],
     meetups: [],
+    meetupHosts: Object.fromEntries(state.people.map((p) => [p.user.id, p])),
     now: Date.now(),
     dark: false,
     onPersonPress: vi.fn(),
@@ -208,4 +214,29 @@ it('moves a marker when new authorized location data arrives, not when its statu
   expect(pins()[0].props.coordinate).toBe(coordinate);
   expect(coordinate.latitude.value).toBe(moved.latitude);
   expect(coordinate.longitude.value).toBe(moved.longitude);
+});
+
+it('renders the authorized meetup creator even when their live location is private', async () => {
+  const state = createSeed();
+  const meetup = state.meetups[0];
+  const creator = {
+    ...state.people.find((p) => p.user.id === meetup.hostId)!,
+    location: undefined,
+  };
+  props = { ...props, people: [], meetups: [meetup], meetupHosts: { [meetup.hostId]: creator } };
+  await act(async () => {
+    tree.update(<SocialMap {...props} />);
+  });
+  const marker = tree.root.findByType('MeetupMarker' as React.ElementType);
+  expect(marker.props.host).toBe(creator);
+  expect(marker.props.meetup.hostId).toBe(creator.user.id);
+  await act(async () => {
+    marker.props.onPress();
+  });
+  expect(props.onMeetupPress).toHaveBeenCalledWith(meetup.id);
+  props = { ...props, meetupHosts: {} };
+  await act(async () => {
+    tree.update(<SocialMap {...props} />);
+  });
+  expect(tree.root.findByType('MeetupMarker' as React.ElementType).props.host).toBeUndefined();
 });

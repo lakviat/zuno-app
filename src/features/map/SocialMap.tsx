@@ -249,7 +249,12 @@ export const SocialMap = React.memo(
                 {multiple ? (
                   <MeetupClusterMarker count={group.meetups.length} onPress={onPress} />
                 ) : (
-                  <MeetupMarker compact={width < 720} meetup={group.meetups[0]} onPress={onPress} />
+                  <MeetupMarker
+                    compact={width < 720}
+                    meetup={group.meetups[0]}
+                    host={props.meetupHosts[group.meetups[0].hostId]}
+                    onPress={onPress}
+                  />
                 )}
               </Marker>
             );

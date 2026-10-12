@@ -110,41 +110,71 @@ export const FriendMarker = memo(function FriendMarker({
 });
 export const MeetupMarker = memo(function MeetupMarker({
   meetup,
+  host,
   onPress,
   compact = false,
 }: {
   meetup: Meetup;
+  host?: Person;
   onPress: () => void;
   compact?: boolean;
 }) {
   const { colors } = useTheme();
+  const hostName = host?.profile.displayName;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Open meetup ${meetup.title}`}
+      accessibilityHint={hostName ? `Hosted by ${hostName}` : 'Host unavailable'}
       onPress={onPress}
-      style={{
-        backgroundColor: colors.surface,
-        borderWidth: 2,
-        borderColor: colors.accent,
-        borderRadius: 14,
-        padding: 9,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        ...tokens.shadow,
-      }}
+      style={{ paddingTop: host ? 16 : 0, maxWidth: compact ? 150 : 235 }}
     >
-      <Txt style={{ fontSize: 19 }}>{meetup.emoji}</Txt>
-      <Txt weight="bold" numberOfLines={1} style={{ fontSize: 11, maxWidth: 165 }}>
-        {compact ? meetup.participantIds.length : meetup.title}
-      </Txt>
-      {meetupLifecycle(meetup, Date.now()) === 'active' ? (
-        <Txt weight="bold" style={{ fontSize: 9, color: colors.green }}>
-          NOW
+      <View
+        style={{
+          backgroundColor: colors.surface,
+          borderWidth: 2,
+          borderColor: colors.accent,
+          borderRadius: 16,
+          padding: 10,
+          paddingTop: host ? 19 : 10,
+          gap: 5,
+          ...tokens.shadow,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Txt style={{ fontSize: 19 }}>{meetup.emoji}</Txt>
+          <Txt weight="bold" numberOfLines={1} style={{ fontSize: 11, flexShrink: 1 }}>
+            {compact ? `${meetup.participantIds.length} going` : meetup.title}
+          </Txt>
+          {meetupLifecycle(meetup, Date.now()) === 'active' ? (
+            <Txt weight="bold" style={{ fontSize: 9, color: colors.green }}>
+              NOW
+            </Txt>
+          ) : (
+            <View
+              style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent }}
+            />
+          )}
+        </View>
+        <Txt muted weight="medium" numberOfLines={1} style={{ fontSize: 11 }}>
+          {hostName ? `By ${hostName}` : 'Host unavailable'}
         </Txt>
-      ) : (
-        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent }} />
+      </View>
+      {host && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 10,
+            padding: 2,
+            borderRadius: 22,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.accent,
+          }}
+        >
+          <Avatar person={host} size={30} />
+        </View>
       )}
     </Pressable>
   );

@@ -54,6 +54,10 @@ export function WorldScreen() {
   const [route, setRoute] = useState<Route>(() =>
     cloud && !signedIn ? { name: 'account' } : { name: 'map' },
   );
+  const meetupHosts = useMemo(
+    () => Object.fromEntries(state.people.map((p) => [p.user.id, p])),
+    [state.people],
+  );
   const [selected, setSelected] = useState<string>();
   const [placing, setPlacing] = useState<{ friendId?: string }>();
   const [moving, setMoving] = useState(false);
@@ -205,6 +209,7 @@ export function WorldScreen() {
         people={mapPeople}
         me={mapMe}
         meetups={meetups}
+        meetupHosts={meetupHosts}
         dark={dark}
         selectedId={selected}
         onPersonPress={selectPerson}
