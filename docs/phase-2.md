@@ -20,11 +20,11 @@ The largest avoidable JS workload found during inspection was the camera-to-Reac
 
 - Neighborhood camera commands no longer set React state for altitude. The map now also keeps a constant viewport and renderer at world scale.
 - The continuous region callback is removed. Region settlement coalesces for 180 ms, and marker placement/discovery wait until the edge gesture ends. Native touch and programmatic camera ownership remain distinct.
-- Individual avatar placement and meetup clusters update from data and settled region. Person marker components and artwork are memoized. Apple custom views update directly; Google bitmap tracking runs briefly when artwork changes rather than continuously.
+- Native avatars stay on their geographic coordinates throughout camera movement; only meetup clustering waits for settled region updates. Person marker components and artwork are memoized. Apple custom views update directly; Google bitmap tracking runs briefly when artwork changes rather than continuously.
 - A stable theme context isolates theme consumers; map markers receive the application clock so expired Free now badges clear without a tap. The native map is memoized and receives stable selection callbacks and memoized data projections.
 - Individual moving markers subscribe to an ephemeral per-user store. GPS samples do not write the whole application snapshot or AsyncStorage. First fixes and long gaps snap to their valid location; recent neighboring fixes interpolate. Coordinate interpolation uses React Native Animated values, without React state per animation frame. The Apple Maps coordinate prop still uses the JS animation driver; this is not a claim of UI-thread-only animation.
 
-Rotation remains disabled as in the existing app; panning, double-tap/pinch and both edge zoom gestures remain. People remain individually rendered at every scale, including the self pin. Overlaps are separated using the provider’s screen projection and connected to their real positions with leader lines. Meetup clustering remains. Large-data stress testing remains future work. No 60/120 fps or battery-life claim is made without physical-device profiling.
+Rotation remains disabled as in the existing app; panning, double-tap/pinch and both edge zoom gestures remain. People remain individually rendered at every scale, including the self pin. Nearby avatars may overlap at distant zoom levels; their displayed locations are never spread apart and there are no connector lines. Meetup clustering remains. Large-data stress testing remains future work. No 60/120 fps or battery-life claim is made without physical-device profiling.
 
 ## Location and consent boundaries
 

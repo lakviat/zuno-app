@@ -8,7 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import MapView, { Marker, Polyline, type Region } from 'react-native-maps';
+import MapView, { Marker, type Region } from 'react-native-maps';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Txt } from '../../components/ui';
 import { useTheme } from '../../state/AppContext';
@@ -19,7 +19,6 @@ import { MIN_ZOOM, MAX_ZOOM } from './zoom';
 import { createNativeCamera } from './nativeCamera';
 import { APPLE_MIN_ALTITUDE, APPLE_MAX_ALTITUDE } from './appleCamera';
 import { clusterMeetups } from './meetupClusters';
-import { layoutPeople } from './peopleLayout';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
 
 export const SocialMap = React.memo(
@@ -45,7 +44,6 @@ export const SocialMap = React.memo(
     });
     const regionRef = useRef(region);
     const nativeMoving = useRef(false);
-    const [moving, setMoving] = useState(false);
     const zoom = useMemo(
       () =>
         createNativeCamera({
@@ -89,7 +87,6 @@ export const SocialMap = React.memo(
         },
         beginZoom: () => {
           clearTimeout(settledTimer.current);
-          setMoving(true);
           callbacks.current.onMoving?.();
           zoom.begin();
         },
@@ -109,44 +106,6 @@ export const SocialMap = React.memo(
       [props.people, props.me],
     );
     const compactPeople = width < 720 || region.latitudeDelta > 0.1;
-    const [offsets, setOffsets] = useState<Record<string, { x: number; y: number }>>({});
-    const [connectors, setConnectors] = useState<
-      { id: string; coordinates: { latitude: number; longitude: number }[] }[]
-    >([]);
-    useEffect(() => {
-      let cancelled = false;
-      if (!mapReady || !map.current) return;
-      const nativeMap = map.current;
-      // Use MapKit's real projection. Offset overlapping avatars, never their saved GPS.
-      void Promise.all(
-        people.map(async (person) => {
-          const point = await nativeMap.pointForCoordinate(person.location!.coordinate);
-          return { person, ...point };
-        }),
-      )
-        .then(async (points) => {
-          const placed = layoutPeople(points, compactPeople);
-          const lines = await Promise.all(
-            placed
-              .filter((p) => p.offset.x || p.offset.y)
-              .map(async (p) => ({
-                id: p.person.user.id,
-                coordinates: [
-                  p.person.location!.coordinate,
-                  await nativeMap.coordinateForPoint({ x: p.x + p.offset.x, y: p.y + p.offset.y }),
-                ],
-              })),
-          );
-          if (cancelled || zoom.isActive() || nativeMoving.current) return;
-          setOffsets(Object.fromEntries(placed.map((p) => [p.person.user.id, p.offset])));
-          setConnectors(lines);
-          setMoving(false);
-        })
-        .catch(() => {});
-      return () => {
-        cancelled = true;
-      };
-    }, [people, region, mapReady, compactPeople, width, height, zoom]);
     const meetupGroups = useMemo(
       () =>
         clusterMeetups(
@@ -180,7 +139,6 @@ export const SocialMap = React.memo(
             clearTimeout(settledTimer.current);
             zoom.nativeGesture();
             nativeMoving.current = false;
-            setMoving(true);
             callbacks.current.onMoving?.();
           }}
           onTouchEnd={() => {
@@ -191,7 +149,6 @@ export const SocialMap = React.memo(
           }}
           onRegionChangeStart={() => {
             nativeMoving.current = true;
-            setMoving(true);
             clearTimeout(settledTimer.current);
           }}
           onLongPress={(event) => callbacks.current.onLongPress?.(event.nativeEvent.coordinate)}
@@ -224,16 +181,6 @@ export const SocialMap = React.memo(
           showsMyLocationButton={false}
           mapPadding={{ top: 85, bottom: 105, left: 12, right: 12 }}
         >
-          {!moving &&
-            connectors.map((line) => (
-              <Polyline
-                key={line.id}
-                coordinates={line.coordinates}
-                strokeColor="#73867B"
-                strokeWidth={1.5}
-                lineDashPattern={[3, 3]}
-              />
-            ))}
           {people.map((person) => (
             <NativePersonMarker
               now={props.now}
@@ -241,7 +188,6 @@ export const SocialMap = React.memo(
               person={person}
               selected={person.user.id === props.me.user.id || props.selectedId === person.user.id}
               compact={compactPeople}
-              offset={offsets[person.user.id]}
               onSelect={props.onPersonPress}
             />
           ))}

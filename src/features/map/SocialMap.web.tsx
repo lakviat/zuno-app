@@ -15,7 +15,6 @@ import { FriendMarker, MeetupMarker, MeetupClusterMarker } from './MapMarker';
 import { createZoomCamera } from './zoom';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { clusterMeetups } from './meetupClusters';
-import { layoutPeople } from './peopleLayout';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
 
 export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMap(props, ref) {
@@ -149,15 +148,14 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
   const compactPeople = compact || (map.current?.getZoom() ?? 13) < 12;
   const people =
     frame >= 0
-      ? layoutPeople(
-          [...props.people.filter((p) => p.user.id !== props.me.user.id), props.me].flatMap(
-            (person) => {
-              const c = person.location?.coordinate;
-              const point = c && project(c.latitude, c.longitude);
-              return point ? [{ person, x: point.x, y: point.y }] : [];
-            },
-          ),
-          compactPeople,
+      ? [...props.people.filter((p) => p.user.id !== props.me.user.id), props.me].flatMap(
+          (person) => {
+            const c = person.location?.coordinate;
+            const point = c && project(c.latitude, c.longitude);
+            return point && Number.isFinite(point.x) && Number.isFinite(point.y)
+              ? [{ person, x: point.x, y: point.y }]
+              : [];
+          },
         )
       : [];
   return (
@@ -204,36 +202,14 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
               )}
             </View>
           ))}
-          <svg
-            aria-hidden="true"
-            width="100%"
-            height="100%"
-            style={{ position: 'absolute', pointerEvents: 'none' }}
-          >
-            {people
-              .filter((p) => p.offset.x || p.offset.y)
-              .map(({ person, x, y, offset }) => (
-                <g key={person.user.id}>
-                  <line
-                    x1={x}
-                    y1={y}
-                    x2={x + offset.x}
-                    y2={y + offset.y}
-                    stroke="#73867B"
-                    strokeWidth={1.5}
-                    strokeDasharray="3 3"
-                  />
-                  <circle cx={x} cy={y} r={2.5} fill="#73867B" />
-                </g>
-              ))}
-          </svg>
-          {people.map(({ person, x, y, offset }) => (
+          {people.map(({ person, x, y }) => (
             <View
               key={person.user.id}
               style={{
                 position: 'absolute',
-                left: x + offset.x - (compactPeople ? 36 : 70),
-                top: y + offset.y - (compactPeople ? 40 : 72),
+                left: x,
+                top: y,
+                transform: [{ translateX: '-50%' }, { translateY: '-50%' }],
                 zIndex:
                   person.user.id === props.me.user.id || props.selectedId === person.user.id
                     ? 2

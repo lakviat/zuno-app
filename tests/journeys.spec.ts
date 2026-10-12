@@ -373,3 +373,32 @@ test('keeps individual people at wide zoom and persists activity badges on map a
   await page.getByRole('button', { name: 'Set availability', exact: true }).click();
   await expect(me.getByLabel('Busy · Drinks', { exact: true })).toHaveText('🍸');
 });
+
+test('nearby avatars converge on their map locations when zooming out and return without spreading', async ({
+  page,
+}) => {
+  const alex = page.getByRole('button', { name: 'Find Alex Rivera', exact: true });
+  const marcus = page.getByRole('button', { name: 'Find Marcus Lee', exact: true });
+  await expect(alex).toBeVisible({ timeout: 25000 });
+  await expect(marcus).toBeVisible();
+  const separation = async () => {
+    const a = (await alex.boundingBox())!;
+    const b = (await marcus.boundingBox())!;
+    return { x: b.x + b.width / 2 - a.x - a.width / 2, y: b.y + b.height / 2 - a.y - a.height / 2 };
+  };
+  const initial = await separation();
+  let steps = 0;
+  for (const direction of ['out', 'out', 'out', 'out', 'in', 'in', 'in', 'in']) {
+    steps += direction === 'out' ? -1 : 1;
+    await page.getByRole('button', { name: `Zoom ${direction}`, exact: true }).click();
+    const scale = 2 ** (steps * 0.6);
+    // For fixed coordinates in an unpitched Mercator map, one zoom level doubles
+    // both screen-axis separations. A minimum-distance avatar layout breaks this.
+    await expect
+      .poll(async () => {
+        const actual = await separation();
+        return Math.hypot(actual.x - initial.x * scale, actual.y - initial.y * scale);
+      })
+      .toBeLessThan(2);
+  }
+});

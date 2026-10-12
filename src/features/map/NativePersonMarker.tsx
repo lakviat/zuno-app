@@ -12,14 +12,12 @@ export const NativePersonMarker = memo(function NativePersonMarker({
   person,
   compact,
   selected,
-  offset,
   now,
   onSelect,
 }: {
   person: Person;
   compact: boolean;
   selected: boolean;
-  offset?: { x: number; y: number };
   now: number;
   onSelect(id: string): void;
 }) {
@@ -76,7 +74,7 @@ export const NativePersonMarker = memo(function NativePersonMarker({
       coordinate={coordinate}
       tracksViewChanges={tracking}
       displayPriority="required"
-      centerOffset={offset}
+      anchor={{ x: 0.5, y: 0.5 }}
       zIndex={selected ? 5 : 4}
       onPress={() => onSelect(person.user.id)}
     >
