@@ -15,6 +15,12 @@ import { FriendMarker, MeetupMarker, MeetupClusterMarker } from './MapMarker';
 import { createZoomCamera } from './zoom';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { clusterMeetups } from './meetupClusters';
+import {
+  meetupMarkerSize,
+  meetupDetail,
+  meetupClusterRadius,
+  type MeetupDetail,
+} from './meetupPresentation';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
 
 export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMap(props, ref) {
@@ -23,6 +29,7 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const [frame, setFrame] = useState(0);
+  const level = useRef<MeetupDetail>('detail');
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const { colors } = useTheme();
@@ -144,6 +151,14 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
   );
   const project = (latitude: number, longitude: number) =>
     map.current?.project([longitude, latitude]);
+  level.current = meetupDetail(map.current?.getZoom() ?? 13, level.current);
+  const meetupGroups = clusterMeetups(
+    props.meetups.flatMap((meetup) => {
+      const point = project(meetup.place.coordinate.latitude, meetup.place.coordinate.longitude);
+      return point ? [{ meetup, x: point.x, y: point.y }] : [];
+    }),
+    meetupClusterRadius(level.current),
+  );
   // frame is an intentional camera invalidation counter for geographic overlays.
   const compactPeople = compact || (map.current?.getZoom() ?? 13) < 12;
   const people =
@@ -170,22 +185,21 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
           pointerEvents="box-none"
           style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}
         >
-          {clusterMeetups(
-            props.meetups.flatMap((meetup) => {
-              const point = project(
-                meetup.place.coordinate.latitude,
-                meetup.place.coordinate.longitude,
-              );
-              return point ? [{ meetup, x: point.x, y: point.y }] : [];
-            }),
-            compact ? 70 : 170,
-          ).map((group) => (
+          {meetupGroups.map((group) => (
             <View
-              key={group.meetups.map((m) => m.id).join(':')}
+              key={`${group.meetups.length > 1 ? 'cluster' : 'meetup'}:${group.meetups[0].id}`}
+              pointerEvents="box-none"
               style={{
                 position: 'absolute',
-                left: group.x - (compact || group.meetups.length > 1 ? 28 : 75),
-                top: group.y + 16,
+                // Nearby cards leave individual avatars tappable; compact overview
+                // targets stay visible when geographic points converge.
+                zIndex: level.current === 'detail' ? 1 : 4,
+                left: group.x,
+                top: group.y,
+                ...meetupMarkerSize(group.meetups.length > 1 ? 'cluster' : level.current),
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                transform: [{ translateX: '-50%' }, { translateY: '-100%' }],
               }}
             >
               {group.meetups.length > 1 ? (
@@ -195,7 +209,8 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
                 />
               ) : (
                 <MeetupMarker
-                  compact={compact}
+                  now={props.now}
+                  detail={level.current}
                   meetup={group.meetups[0]}
                   host={props.meetupHosts[group.meetups[0].hostId]}
                   onPress={() => props.onMeetupPress(group.meetups[0].id)}
@@ -211,15 +226,24 @@ export const SocialMap = forwardRef<MapHandle, SocialMapProps>(function SocialMa
                 left: x,
                 top: y,
                 transform: [{ translateX: '-50%' }, { translateY: '-50%' }],
+                // Your profile is also in the header. Let a meetup at your own
+                // coordinate stay reachable while other people's avatars remain selectable.
                 zIndex:
-                  person.user.id === props.me.user.id || props.selectedId === person.user.id
-                    ? 2
-                    : 1,
+                  person.user.id === props.me.user.id
+                    ? 0
+                    : props.selectedId === person.user.id
+                      ? 3
+                      : 2,
               }}
             >
               <FriendMarker
                 now={props.now}
-                compact={compactPeople}
+                // Desktop status bubbles must not cover a meetup at the same spot.
+                // Use the existing phone-sized avatar there without moving its coordinate.
+                compact={
+                  compactPeople ||
+                  meetupGroups.some((g) => Math.abs(g.x - x) < 100 && Math.abs(g.y - y) < 120)
+                }
                 person={person}
                 selected={
                   person.user.id === props.me.user.id || props.selectedId === person.user.id

@@ -6,6 +6,7 @@ import { useTheme } from '../../state/AppContext';
 import { tokens } from '../../theme/tokens';
 import type { Person, Meetup } from '../../types/domain';
 import { presencePresentation } from '../presence/presentation';
+import { meetupMarkerSize, type MeetupDetail } from './meetupPresentation';
 
 export const FriendMarker = memo(function FriendMarker({
   person,
@@ -108,72 +109,136 @@ export const FriendMarker = memo(function FriendMarker({
     </Pressable>
   );
 });
+/** The bottom-center tip is the coordinate anchor in every presentation. */
+function MeetupTip() {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{
+        alignSelf: 'center',
+        width: 0,
+        height: 0,
+        borderLeftWidth: 5,
+        borderRightWidth: 5,
+        borderTopWidth: 6,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: colors.accent,
+      }}
+    />
+  );
+}
+
 export const MeetupMarker = memo(function MeetupMarker({
   meetup,
   host,
   onPress,
-  compact = false,
+  now,
+  detail = 'detail',
 }: {
   meetup: Meetup;
   host?: Person;
   onPress: () => void;
-  compact?: boolean;
+  now: number;
+  detail?: MeetupDetail;
 }) {
   const { colors } = useTheme();
   const hostName = host?.profile.displayName;
+  const detailed = detail === 'detail';
+  const overview = detail === 'overview';
   return (
     <Pressable
+      testID={`meetup-pin-${meetup.id}-${detail}`}
       accessibilityRole="button"
       accessibilityLabel={`Open meetup ${meetup.title}`}
-      accessibilityHint={hostName ? `Hosted by ${hostName}` : 'Host unavailable'}
+      accessibilityHint={`${hostName ? `Hosted by ${hostName}` : 'Host unavailable'} · ${meetup.participantIds.length} going`}
       onPress={onPress}
-      style={{ paddingTop: host ? 16 : 0, maxWidth: compact ? 150 : 235 }}
+      style={{
+        ...meetupMarkerSize(detail),
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+      }}
     >
       <View
         style={{
+          width: detailed ? 135 : overview ? 26 : 58,
+          height: detailed ? 64 : overview ? 26 : 36,
           backgroundColor: colors.surface,
           borderWidth: 2,
           borderColor: colors.accent,
-          borderRadius: 16,
-          padding: 10,
-          paddingTop: host ? 19 : 10,
-          gap: 5,
+          borderRadius: detailed ? 14 : 18,
+          paddingHorizontal: detailed ? 9 : 3,
+          paddingTop: detailed ? 15 : 0,
+          justifyContent: 'center',
+          gap: 2,
           ...tokens.shadow,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Txt style={{ fontSize: 19 }}>{meetup.emoji}</Txt>
-          <Txt weight="bold" numberOfLines={1} style={{ fontSize: 11, flexShrink: 1 }}>
-            {compact ? `${meetup.participantIds.length} going` : meetup.title}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: detailed ? 'flex-start' : 'center',
+            gap: 4,
+          }}
+        >
+          {!detailed && !overview && host && <Avatar person={host} size={22} />}
+          <Txt style={{ fontSize: overview ? 13 : 17 }} maxFontSizeMultiplier={1.2}>
+            {meetup.emoji}
           </Txt>
-          {meetupLifecycle(meetup, Date.now()) === 'active' ? (
-            <Txt weight="bold" style={{ fontSize: 9, color: colors.green }}>
-              NOW
-            </Txt>
-          ) : (
-            <View
-              style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent }}
-            />
+          {detailed && (
+            <>
+              <Txt
+                weight="bold"
+                numberOfLines={1}
+                style={{ fontSize: 10, flexShrink: 1 }}
+                maxFontSizeMultiplier={1.2}
+              >
+                {meetup.participantIds.length} going
+              </Txt>
+              {meetupLifecycle(meetup, now) === 'active' ? (
+                <Txt
+                  weight="bold"
+                  style={{ fontSize: 9, color: colors.green }}
+                  maxFontSizeMultiplier={1.2}
+                >
+                  NOW
+                </Txt>
+              ) : (
+                <View
+                  style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent }}
+                />
+              )}
+            </>
           )}
         </View>
-        <Txt muted weight="medium" numberOfLines={1} style={{ fontSize: 11 }}>
-          {hostName ? `By ${hostName}` : 'Host unavailable'}
-        </Txt>
+        {detailed && (
+          <Txt
+            muted
+            weight="medium"
+            numberOfLines={1}
+            style={{ fontSize: 10 }}
+            maxFontSizeMultiplier={1.2}
+          >
+            {hostName ? `By ${hostName}` : 'Host unavailable'}
+          </Txt>
+        )}
       </View>
-      {host && (
+      <MeetupTip />
+      {detailed && host && (
         <View
           style={{
             position: 'absolute',
             top: 0,
-            left: 10,
+            left: 9,
             padding: 2,
-            borderRadius: 22,
+            borderRadius: 20,
             backgroundColor: colors.surface,
             borderWidth: 1,
             borderColor: colors.accent,
           }}
         >
-          <Avatar person={host} size={30} />
+          <Avatar person={host} size={27} />
         </View>
       )}
     </Pressable>
@@ -192,23 +257,29 @@ export const MeetupClusterMarker = memo(function MeetupClusterMarker({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Browse ${count} nearby meetups`}
+      accessibilityHint="Opens all meetups in this group. Zoom in to separate their pins."
       onPress={onPress}
-      style={{
-        minWidth: 56,
-        minHeight: 44,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 10,
-        backgroundColor: colors.accent,
-        borderWidth: 2,
-        borderColor: colors.surface,
-        borderRadius: 16,
-        ...tokens.shadow,
-      }}
+      style={{ ...meetupMarkerSize('cluster'), justifyContent: 'flex-end', alignItems: 'center' }}
     >
-      <Txt weight="bold" style={{ color: 'white', fontSize: 16 }}>
-        ☀ {count}
-      </Txt>
+      <View
+        style={{
+          height: 34,
+          minWidth: 40,
+          paddingHorizontal: 5,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: colors.accent,
+          borderWidth: 2,
+          borderColor: colors.surface,
+          borderRadius: 17,
+          ...tokens.shadow,
+        }}
+      >
+        <Txt weight="bold" style={{ color: 'white', fontSize: 12 }} maxFontSizeMultiplier={1.2}>
+          {count}
+        </Txt>
+      </View>
+      <MeetupTip />
     </Pressable>
   );
 });

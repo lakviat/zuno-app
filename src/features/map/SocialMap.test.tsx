@@ -5,6 +5,7 @@ import { createSeed } from '../../mocks/seed';
 import { SocialMap } from './SocialMap';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
 import { APPLE_MAX_ALTITUDE, APPLE_MIN_ALTITUDE } from './appleCamera';
+import { meetupMarkerSize, MEETUP_ANCHOR } from './meetupPresentation';
 
 const m = vi.hoisted(() => ({
   nativeMap: {
@@ -239,4 +240,56 @@ it('renders the authorized meetup creator even when their live location is priva
     tree.update(<SocialMap {...props} />);
   });
   expect(tree.root.findByType('MeetupMarker' as React.ElementType).props.host).toBeUndefined();
+});
+
+it('resizes meetup artwork through the whole zoom range without changing the saved coordinate or native anchor', async () => {
+  const meetup = createSeed().meetups[0];
+  const coordinate = { latitude: 26.01234567, longitude: 179.99876543 };
+  props = { ...props, meetups: [{ ...meetup, place: { ...meetup.place, coordinate } }] };
+  await act(async () => tree.update(<SocialMap {...props} ref={handle} />));
+  for (const [delta, detail] of [
+    [0, 'detail'],
+    [-3, 'badge'],
+    [-5, 'overview'],
+    [-30, 'overview'],
+    [30, 'detail'],
+  ] as const) {
+    await act(async () => {
+      await handle.current!.zoomBy(delta);
+    });
+    const pin = tree.root.findByType('Marker' as React.ElementType);
+    expect(pin.props.coordinate).toBe(coordinate);
+    expect(pin.props.anchor).toEqual(MEETUP_ANCHOR);
+    const size = meetupMarkerSize(detail);
+    expect(pin.props.style).toEqual(size);
+    // The visual bottom-center stays at the geographic point in every size.
+    expect(pin.props.centerOffset.x).toBe(0);
+    expect(pin.props.centerOffset.y + size.height / 2).toBe(0);
+    expect(pin.findByType('View' as React.ElementType).props.style).toMatchObject(size);
+    expect(tree.root.findByType('MeetupMarker' as React.ElementType).props.detail).toBe(detail);
+  }
+  await act(async () => {
+    mapView().props.onRegionChangeComplete({
+      latitude: 26,
+      longitude: -179.9,
+      latitudeDelta: 0.6,
+      longitudeDelta: 0.5,
+    });
+    vi.advanceTimersByTime(200);
+  });
+  expect(tree.root.findByType('Marker' as React.ElementType).props.coordinate).toBe(coordinate);
+});
+
+it('opens all grouped meetups and anchors the count badge to a saved meeting spot', async () => {
+  const meetup = createSeed().meetups[0];
+  const coordinate = meetup.place.coordinate;
+  props = { ...props, meetups: ['a', 'b', 'c'].map((id) => ({ ...meetup, id })) };
+  await act(async () => tree.update(<SocialMap {...props} />));
+  expect(tree.root.findAllByType('Marker' as React.ElementType)).toHaveLength(1);
+  const pin = tree.root.findByType('Marker' as React.ElementType);
+  expect(pin.props.coordinate).toBe(coordinate);
+  const badge = tree.root.findByType('MeetupClusterMarker' as React.ElementType);
+  expect(badge.props.count).toBe(3);
+  await act(async () => badge.props.onPress());
+  expect(props.onMeetupClusterPress).toHaveBeenCalledWith(['a', 'b', 'c']);
 });

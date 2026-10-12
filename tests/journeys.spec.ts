@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { createSeed } from '../src/mocks/seed';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -90,7 +91,7 @@ test('creates a public meetup, joins as a non-friend, persists, edits and cancel
   await expect(page.getByRole('button', { name: 'View Coffee & a catch-up' })).toHaveCount(0);
   await page.getByRole('button', { name: 'View A sunny afternoon walk' }).click();
   await page.getByRole('button', { name: 'Join meetup', exact: true }).click();
-  await expect(page.getByText('2 going', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('2 going', { exact: true })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: 'Meetups', exact: true }).click();
   await page.getByRole('button', { name: 'Switch demo viewer' }).click();
@@ -98,7 +99,7 @@ test('creates a public meetup, joins as a non-friend, persists, edits and cancel
   await page.getByRole('button', { name: 'View A sunny afternoon walk' }).click();
   await expect(page.getByRole('button', { name: 'Leave meetup', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Leave meetup', exact: true }).click();
-  await expect(page.getByText('1 going', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('1 going', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Join meetup', exact: true }).click();
   await page.getByRole('button', { name: 'Go back', exact: true }).click();
   await page.getByRole('button', { name: 'Switch demo viewer' }).click();
@@ -507,4 +508,102 @@ test('optional meetup titles follow the activity, preserve custom text, and show
   await expect(card.getByText('Hosted by Maya Chen', { exact: true })).toBeVisible();
   await card.click();
   await expect(host).toBeVisible();
+});
+
+test('meetup artwork shrinks with zoom while its tip stays at the same geographic point', async ({
+  page,
+}) => {
+  const seed = createSeed();
+  const coordinate = { latitude: 25.79012345, longitude: -80.14234567 };
+  seed.people[0].location!.coordinate = coordinate;
+  seed.meetups = [
+    {
+      ...seed.meetups[0],
+      id: 'precision',
+      title: 'Anchored coffee',
+      visibility: 'public',
+      place: { ...seed.meetups[0].place, coordinate, precision: 'precise', kind: 'map-pin' },
+    },
+  ];
+  await page.evaluate(
+    (snapshot) => localStorage.setItem('zuno.demo.v1', JSON.stringify(snapshot)),
+    seed,
+  );
+  await page.reload();
+  const pin = page.getByRole('button', { name: 'Open meetup Anchored coffee', exact: true });
+  const person = page.getByRole('button', { name: 'Find Maya Chen', exact: true });
+  const checkAnchor = async () => {
+    // Independent person overlay at the same coordinate is centered on the point;
+    // the meetup's bottom-center tip must coincide, regardless of artwork size.
+    await expect
+      .poll(async () => {
+        const a = await pin.boundingBox(),
+          b = await person.boundingBox();
+        return a && b
+          ? Math.hypot(a.x + a.width / 2 - b.x - b.width / 2, a.y + a.height - b.y - b.height / 2)
+          : 100;
+      })
+      .toBeLessThan(1);
+  };
+  await expect(page.getByTestId('meetup-pin-precision-detail')).toBeVisible();
+  await expect.poll(async () => (await pin.boundingBox())?.width).toBe(135);
+  await checkAnchor();
+  await page.screenshot({ path: 'test-results/meetup-nearby.png' });
+  for (let i = 0; i < 3; i++)
+    await page.getByRole('button', { name: 'Zoom out', exact: true }).click();
+  await expect(page.getByTestId('meetup-pin-precision-badge')).toBeVisible();
+  await expect.poll(async () => (await pin.boundingBox())?.width).toBe(58);
+  await checkAnchor();
+  for (let i = 0; i < 5; i++)
+    await page.getByRole('button', { name: 'Zoom out', exact: true }).click();
+  await expect(page.getByTestId('meetup-pin-precision-overview')).toBeVisible();
+  await expect.poll(async () => (await pin.boundingBox())?.width).toBe(44);
+  await checkAnchor();
+  await page.screenshot({ path: 'test-results/meetup-overview.png' });
+  for (let i = 0; i < 8; i++)
+    await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await expect(page.getByTestId('meetup-pin-precision-detail')).toBeVisible();
+  await checkAnchor();
+  await pin.click();
+  await expect(
+    page.getByRole('button', { name: "View meetup host Alex Rivera's profile", exact: true }),
+  ).toBeVisible();
+});
+
+test('a thousand nearby meetups collapse into reachable count badges', async ({ page }) => {
+  const seed = createSeed();
+  seed.meetups = Array.from({ length: 1000 }, (_, i) => ({
+    ...seed.meetups[0],
+    id: `density-${String(i).padStart(4, '0')}`,
+    title: `Coffee ${i}`,
+    visibility: 'public',
+    place: {
+      ...seed.meetups[0].place,
+      coordinate: {
+        latitude: 25.786 + Math.floor(i / 25) * 0.0001,
+        longitude: -80.143 + (i % 25) * 0.0001,
+      },
+    },
+  }));
+  seed.people = seed.people.map((p) => ({ ...p, location: undefined, discoverability: 'hidden' }));
+  await page.evaluate(
+    (snapshot) => localStorage.setItem('zuno.demo.v1', JSON.stringify(snapshot)),
+    seed,
+  );
+  await page.reload();
+  const groups = page.getByRole('button', { name: /^Browse \d+ nearby meetups$/ });
+  await expect.poll(async () => (await groups.all()).length).toBeGreaterThan(0);
+  expect(await groups.count()).toBeLessThan(20);
+  const counts = await groups.evaluateAll((nodes) =>
+    nodes.map((n) => Number(n.getAttribute('aria-label')!.match(/\d+/)![0])),
+  );
+  expect(counts.reduce((sum, n) => sum + n, 0)).toBe(1000);
+  await page.screenshot({ path: 'test-results/meetup-density-1000.png' });
+  await groups.first().click();
+  const cards = page.getByRole('button', { name: /^View Coffee \d+$/ });
+  await expect(cards).toHaveCount(counts[0]);
+  await cards.first().click();
+  await expect(
+    page.getByRole('button', { name: "View meetup host Alex Rivera's profile", exact: true }),
+  ).toBeVisible();
 });

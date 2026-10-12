@@ -17,8 +17,22 @@ import { NativePersonMarker } from './NativePersonMarker';
 import { longitudeOffset } from '../../utils/geo';
 import { MIN_ZOOM, MAX_ZOOM } from './zoom';
 import { createNativeCamera } from './nativeCamera';
-import { APPLE_MIN_ALTITUDE, APPLE_MAX_ALTITUDE, globeViewportHeight } from './appleCamera';
+import {
+  APPLE_MIN_ALTITUDE,
+  APPLE_MAX_ALTITUDE,
+  appleZoom,
+  globeViewportHeight,
+} from './appleCamera';
 import { clusterMeetups } from './meetupClusters';
+import {
+  MEETUP_ANCHOR,
+  meetupMarkerSize,
+  meetupCenterOffset,
+  meetupDetail,
+  meetupClusterRadius,
+  viewportZoom,
+  type MeetupDetail,
+} from './meetupPresentation';
 import { MIAMI, type MapHandle, type SocialMapProps } from './types';
 
 export const SocialMap = React.memo(
@@ -34,6 +48,7 @@ export const SocialMap = React.memo(
     const { colors } = useTheme();
     const [mapReady, setMapReady] = useState(false);
     const [globe, setGlobe] = useState(false);
+    const [meetupLevel, setMeetupLevel] = useState<MeetupDetail>('detail');
     const [fittedHeight, setFittedHeight] = useState(height);
     const viewportHeight = globe ? Math.min(height, fittedHeight) : height;
     const lastAltitude = useRef(0);
@@ -66,6 +81,8 @@ export const SocialMap = React.memo(
           onGlobeChange: setGlobe,
           onAltitudeChange: (altitude) => {
             lastAltitude.current = altitude;
+            // Only changes React state at a presentation boundary, not every camera frame.
+            setMeetupLevel((previous) => meetupDetail(appleZoom(altitude) + 2, previous));
             const d = dimensions.current;
             setFittedHeight(globeViewportHeight(altitude, d.width, d.height));
           },
@@ -139,9 +156,9 @@ export const SocialMap = React.memo(
               ((region.latitude - meetup.place.coordinate.latitude) / region.latitudeDelta) *
               height,
           })),
-          width < 720 ? 70 : 170,
+          meetupClusterRadius(meetupLevel),
         ),
-      [props.meetups, region, width, height],
+      [props.meetups, region, width, height, meetupLevel],
     );
     return (
       <View
@@ -193,6 +210,10 @@ export const SocialMap = React.memo(
           onRegionChangeComplete={(next) => {
             nativeMoving.current = false;
             regionRef.current = next;
+            if (Platform.OS !== 'ios')
+              setMeetupLevel((previous) =>
+                meetupDetail(viewportZoom(next.longitudeDelta, width), previous),
+              );
             publishSettled();
           }}
           mapType={Platform.OS === 'ios' ? (globe ? 'hybridFlyover' : 'mutedStandard') : 'standard'}
@@ -231,31 +252,45 @@ export const SocialMap = React.memo(
           ))}
           {meetupGroups.map((group) => {
             const multiple = group.meetups.length > 1;
+            const presentation = multiple ? 'cluster' : meetupLevel;
+            const size = meetupMarkerSize(presentation);
             const onPress = () =>
               multiple
                 ? props.onMeetupClusterPress(group.meetups.map((m) => m.id))
                 : props.onMeetupPress(group.meetups[0].id);
             return (
               <Marker
-                key={group.meetups.map((m) => m.id).join(':')}
-                centerOffset={region.latitudeDelta > 0.15 ? { x: 28, y: 22 } : undefined}
-                zIndex={3}
-                coordinate={{
-                  latitude: region.latitude - (group.y / height) * region.latitudeDelta,
-                  longitude: region.longitude + (group.x / width) * region.longitudeDelta,
-                }}
+                // Recreate only at size boundaries: MapKit's implicit height adjustment
+                // must not shift an existing annotation while its artwork shrinks.
+                key={`${presentation}:${group.meetups[0].id}`}
+                centerOffset={meetupCenterOffset(presentation)}
+                anchor={MEETUP_ANCHOR}
+                style={size}
+                tracksViewChanges={Platform.OS !== 'ios'}
+                // Apple Maps adds 999 to a selected person's z-index. Small meetup
+                // targets must remain tappable above that avatar after its sheet closes.
+                zIndex={1006}
+                displayPriority="required"
+                coordinate={group.meetups[0].place.coordinate}
                 onPress={onPress}
               >
-                {multiple ? (
-                  <MeetupClusterMarker count={group.meetups.length} onPress={onPress} />
-                ) : (
-                  <MeetupMarker
-                    compact={width < 720}
-                    meetup={group.meetups[0]}
-                    host={props.meetupHosts[group.meetups[0].hostId]}
-                    onPress={onPress}
-                  />
-                )}
+                <View
+                  collapsable={false}
+                  pointerEvents="box-none"
+                  style={{ ...size, alignItems: 'center', justifyContent: 'flex-end' }}
+                >
+                  {multiple ? (
+                    <MeetupClusterMarker count={group.meetups.length} onPress={onPress} />
+                  ) : (
+                    <MeetupMarker
+                      now={props.now}
+                      detail={meetupLevel}
+                      meetup={group.meetups[0]}
+                      host={props.meetupHosts[group.meetups[0].hostId]}
+                      onPress={onPress}
+                    />
+                  )}
+                </View>
               </Marker>
             );
           })}
