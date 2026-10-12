@@ -1,11 +1,12 @@
 // Loaded only by AuthGate's explicit development preview branch. Never hosted Auth.
 import { useEffect, useRef, useState, type PropsWithChildren, type ComponentType } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizePhone, type PhoneAuth } from '../../backend/phoneAuth';
 import { endSessionServices } from '../../backend/sessionLifecycle';
-import { palette, tokens } from '../../theme/tokens';
+import { palette } from '../../theme/tokens';
+import { PreviewSessionContext } from './PreviewSessionContext';
 
 const sessionKey = 'zuno.local-phone.session.v1';
 const hint =
@@ -86,38 +87,20 @@ export function LocalPhonePreview({
     );
   if (!signedIn) return <Welcome phoneAuth={auth} localHint={hint} />;
   return (
-    <View style={{ flex: 1 }}>
+    <PreviewSessionContext.Provider
+      value={{
+        signOut: async () => {
+          endSessionServices();
+          requested.current = '';
+          await storage.write(false);
+          setSignedIn(false);
+        },
+      }}
+    >
       {children}
-      <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.footer}>
-        <View style={styles.banner}>
-          <Text style={styles.label}>Phone test mode · sample data</Text>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.button}
-            onPress={() => {
-              endSessionServices();
-              requested.current = '';
-              void storage.write(false).then(() => setSignedIn(false));
-            }}
-          >
-            <Text style={styles.link}>Sign out of phone test</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    </View>
+    </PreviewSessionContext.Provider>
   );
 }
 const styles = StyleSheet.create({
   loading: { flex: 1, justifyContent: 'center', backgroundColor: palette.light.background },
-  footer: { backgroundColor: palette.light.accentSoft },
-  banner: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-  },
-  label: { fontFamily: tokens.font.medium, color: palette.light.ink, fontSize: 12 },
-  button: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
-  link: { fontFamily: tokens.font.bold, color: palette.light.accent, fontSize: 13 },
 });

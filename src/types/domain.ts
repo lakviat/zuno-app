@@ -11,6 +11,7 @@ export interface Profile {
   displayName: string;
   username: string;
   bio: string;
+  instagram?: string;
   city?: string;
   avatar: string;
   color: string;

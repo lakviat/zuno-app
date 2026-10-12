@@ -40,7 +40,7 @@ export function MeetupForm({
   const [defaultStart] = useState(() => Math.ceil((Date.now() + 3600000) / 900000) * 900000);
   const [start, setStart] = useState(() => localDateTime(existing?.startsAt ?? defaultStart));
   const [end, setEnd] = useState(() => localDateTime(existing?.endsAt ?? defaultStart + 3600000));
-  const [visibility, setVisibility] = useState<MeetupVisibility>(existing?.visibility ?? 'friends');
+  const [visibility, setVisibility] = useState<MeetupVisibility>(existing?.visibility ?? 'public');
   const [invites, setInvites] = useState(existing?.invitedUserIds ?? (friendId ? [friendId] : []));
   const [capacity, setCapacity] = useState(existing?.capacity?.toString() ?? '');
   const [validation, setValidation] = useState<{ message: string; values: string }>();
@@ -240,7 +240,6 @@ export function MeetupForm({
           )}
           {customTime && (
             <>
-              {' '}
               <View style={[ui.row, { gap: 8, flexWrap: 'wrap' }]}>
                 <Chip
                   label="In 30 min"
@@ -265,7 +264,7 @@ export function MeetupForm({
           )}
           <Txt weight="bold">Who can see and join?</Txt>
           <View style={[ui.row, { flexWrap: 'wrap', gap: 7 }]}>
-            {(['friends', 'invite-only', 'public'] as const).map((v) => (
+            {(['public', 'friends', 'invite-only'] as const).map((v) => (
               <Chip
                 key={v}
                 label={audienceLabels[v]}

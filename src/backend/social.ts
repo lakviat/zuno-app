@@ -120,6 +120,8 @@ export function cloudError(error: unknown) {
     'Only current members can send to an active meetup',
   ];
   if (allowed.includes(message)) return message + '.';
+  if (message === 'Invalid Instagram username')
+    return 'Check your Instagram username and try again.';
   if (message.includes('zuno_profiles_username')) return 'That username is taken. Choose another.';
   return 'Could not save or refresh. Check your connection and try again.';
 }
@@ -314,7 +316,9 @@ export class SupabaseSocial implements LocationTransport {
       case 'availability': {
         const me = state.people.find((p) => p.user.id === state.currentUserId)!;
         const p = action.type === 'profile' ? { ...me.profile, ...action.value } : me.profile;
-        return this.call('zuno_save_profile', {
+        const savesInstagram = action.type === 'profile' && action.value.instagram !== undefined;
+        return this.call(savesInstagram ? 'zuno_save_profile_details' : 'zuno_save_profile', {
+          ...(savesInstagram ? { instagram: p.instagram ?? '' } : {}),
           display_name: p.displayName,
           bio: p.bio,
           username: p.username,

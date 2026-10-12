@@ -1,6 +1,6 @@
 import { presenceText } from '../presence/presentation';
 import { useEffect, useState } from 'react';
-import { Animated, View } from 'react-native';
+import { Animated, Pressable, View } from 'react-native';
 import { Avatar, Button, Icon, IconButton, Txt, ui } from '../../components/ui';
 import { useApp } from '../../state/AppContext';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
@@ -9,6 +9,9 @@ import type { Navigate } from '../../navigation/routes';
 import type { Person } from '../../types/domain';
 import { useMotion } from '../location/store';
 import { motionLabel } from '../location/motion';
+import { isFriend } from '../../utils/privacy';
+import { FriendshipActions } from './FriendshipActions';
+import { profileDistance } from '../profile/details';
 export function FriendCard({
   person,
   wide,
@@ -24,6 +27,10 @@ export function FriendCard({
 }) {
   const { colors, state, now, dispatch } = useApp();
   const sample = useMotion(person.user.id, person.location?.precision === 'precise');
+  const device = useMotion(state.currentUserId);
+  const distance = profileDistance(state, person.user.id, now, device);
+  const friend = isFriend(state, person.user.id);
+  const openProfile = () => navigate({ name: 'profile', userId: person.user.id });
   const reduced = useReducedMotion();
   const [animation] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -58,15 +65,22 @@ export function FriendCard({
       }}
     >
       <View style={[ui.row, { gap: 13 }]}>
-        <Avatar person={person} size={57} online={person.presence.freeNow} />
-        <View style={{ flex: 1, gap: 5 }}>
-          <Txt weight="display" style={{ fontSize: 24 }}>
-            {person.profile.displayName.split(' ')[0]}
-          </Txt>
-          <Txt muted style={{ fontSize: 11 }}>
-            {presenceText(person.presence, now)}
-          </Txt>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`View ${person.profile.displayName}'s profile`}
+          onPress={openProfile}
+          style={[ui.row, { flex: 1, gap: 13 }]}
+        >
+          <Avatar person={person} size={57} online={person.presence.freeNow} />
+          <View style={{ flex: 1, gap: 5 }}>
+            <Txt weight="display" style={{ fontSize: 24 }}>
+              {person.profile.displayName.split(' ')[0]}
+            </Txt>
+            <Txt muted style={{ fontSize: 11 }}>
+              {presenceText(person.presence, now)}
+            </Txt>
+          </View>
+        </Pressable>
         <IconButton
           label="Close friend card"
           name="x"
@@ -80,13 +94,18 @@ export function FriendCard({
           {person.location?.place ?? 'Location is private'}
         </Txt>
         <Txt muted style={{ fontSize: 11 }}>
-          {person.mapAudience === 'public'
+          {!friend
             ? person.location?.precision === 'approximate'
               ? '· Public · approximate'
               : '· Public'
             : '· Friend'}
         </Txt>
       </View>
+      {!!distance && (
+        <Txt muted style={{ marginTop: 8, fontSize: 12 }}>
+          {distance}
+        </Txt>
+      )}
       {sample && (
         <Txt style={{ marginTop: 10, fontSize: 12 }}>
           {motionLabel(sample, state.discovery.units ?? 'mph', now)} ·{' '}
@@ -99,13 +118,13 @@ export function FriendCard({
           icon="message-circle"
           onPress={() =>
             navigate(
-              person.mapAudience === 'public'
+              !friend
                 ? { name: 'profile', userId: person.user.id }
                 : { name: 'inbox', friendId: person.user.id },
             )
           }
         >
-          {person.mapAudience === 'public' ? 'View profile' : 'Say hello'}
+          {!friend ? 'View profile' : 'Say hello'}
         </Button>
         <Button
           kind="secondary"
@@ -113,20 +132,16 @@ export function FriendCard({
           onPress={() =>
             navigate({
               name: 'create-meetup',
-              friendId: person.mapAudience === 'public' ? undefined : person.user.id,
+              friendId: friend ? person.user.id : undefined,
             })
           }
         >
           Meetup
         </Button>
       </View>
-      <Button
-        kind="quiet"
-        style={{ minHeight: 30, marginTop: 9 }}
-        onPress={() => navigate({ name: 'profile', userId: person.user.id })}
-      >
-        A little more about them ↗
-      </Button>
+      <View style={{ marginTop: 9 }}>
+        <FriendshipActions key={person.user.id} userId={person.user.id} onManage={openProfile} />
+      </View>
       {person.mapAudience === 'public' && (
         <Button
           kind="quiet"

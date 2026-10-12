@@ -3,6 +3,11 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import type { PhoneAuth } from '../../backend/phoneAuth';
 import { LocalPhonePreview } from './LocalPhonePreview';
+import { usePreviewSession } from './PreviewSessionContext';
+function SampleMap() {
+  const session = usePreviewSession();
+  return React.createElement('SampleMap', { signOut: session?.signOut });
+}
 const m = vi.hoisted(() => ({
   values: new Map<string, string>(),
   get: vi.fn(),
@@ -35,7 +40,7 @@ async function mount() {
   await act(async () => {
     tree = create(
       <LocalPhonePreview Welcome={Welcome}>
-        <>{React.createElement('SampleMap')}</>
+        <SampleMap />
       </LocalPhonePreview>,
     );
   });
@@ -76,7 +81,7 @@ describe('iOS phone test session (native storage boundary)', () => {
     expect([...m.values.values()]).toEqual(['signed-in']);
     expect(JSON.stringify([...m.values])).not.toContain('2025550123');
     await act(async () => {
-      tree.root.findByType('Pressable' as React.ElementType).props.onPress();
+      await tree.root.findByType('SampleMap' as React.ElementType).props.signOut();
     });
     expect(m.end).toHaveBeenCalledOnce();
     expect(m.values.size).toBe(0);

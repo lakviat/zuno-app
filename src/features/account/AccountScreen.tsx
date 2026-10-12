@@ -10,10 +10,41 @@ import type { Navigate } from '../../navigation/routes';
 import { AUTH_REDIRECT } from '../../backend/authCallback';
 import { readCloudProfile } from '../../backend/profiles';
 import { backendConfig, supabase, useAccount } from './AccountProvider';
+import { usePreviewSession } from './PreviewSessionContext';
 
 export function AccountScreen({ navigate }: { navigate: Navigate }) {
   const { session } = useAccount();
+  const preview = usePreviewSession();
+  if (preview) return <PreviewAccount navigate={navigate} signOut={preview.signOut} />;
   return <AccountContent key={session?.user.id ?? 'signed-out'} navigate={navigate} />;
+}
+
+function PreviewAccount({ navigate, signOut }: { navigate: Navigate; signOut(): Promise<void> }) {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <Sheet
+      title="Your Zuno account"
+      onClose={() => navigate({ name: 'map' })}
+      back={() => navigate({ name: 'profile' })}
+    >
+      <Button kind="secondary" onPress={() => navigate({ name: 'profile' })}>
+        Your profile
+      </Button>
+      {confirm ? (
+        <>
+          <Txt weight="bold">Sign out of Zuno?</Txt>
+          <Button onPress={() => void signOut()}>Sign out</Button>
+          <Button kind="quiet" onPress={() => setConfirm(false)}>
+            Cancel
+          </Button>
+        </>
+      ) : (
+        <Button kind="secondary" onPress={() => setConfirm(true)}>
+          Sign out of this device
+        </Button>
+      )}
+    </Sheet>
+  );
 }
 
 function AccountContent({ navigate }: { navigate: Navigate }) {

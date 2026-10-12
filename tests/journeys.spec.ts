@@ -70,7 +70,11 @@ test('creates a public meetup, joins as a non-friend, persists, edits and cancel
   await page.getByRole('button', { name: 'Custom date/time', exact: true }).click();
   await page.getByLabel('Starts', { exact: true }).fill('2099-10-02T10:00');
   await page.getByLabel('Ends', { exact: true }).fill('2099-10-02T12:00');
-  await page.getByRole('button', { name: 'Public nearby', exact: true }).click();
+  await expect(
+    page.getByText(
+      'Anyone browsing this area can see and join. Only your chosen meeting spot is published.',
+    ),
+  ).toBeVisible();
   await page
     .getByRole('textbox', { name: 'Capacity including you (optional)', exact: true })
     .fill('2');
@@ -277,6 +281,10 @@ test('drag reversal, stationary touch, release and repeated gestures retain map 
   await page.mouse.move(550, 680, { steps: 12 });
   await page.mouse.up();
   await page.getByRole('button', { name: 'Recenter demo map' }).click();
+  // Recenter animates for 550 ms; wait for its destination before tapping a moving avatar.
+  await expect
+    .poll(async () => Math.abs((await alex.boundingBox())!.x - original))
+    .toBeLessThan(0.5);
   await alex.click();
   await expect(page.getByRole('button', { name: 'Say hello', exact: true })).toBeVisible();
 });
@@ -401,4 +409,48 @@ test('nearby avatars converge on their map locations when zooming out and return
       })
       .toBeLessThan(2);
   }
+});
+
+test('map avatars open profiles and expose real friendship states', async ({ page }) => {
+  await page.getByRole('button', { name: 'Find Mia Thompson', exact: true }).click();
+  await page.getByRole('button', { name: 'Send friend request', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Request sent', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: "View Mia Thompson's profile", exact: true }).click();
+  await expect(page.getByText('About me', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^About \d+ mi away$/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Request sent', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Cancel request', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Send friend request', exact: true }),
+  ).toBeEnabled();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Find Alex Rivera', exact: true }).click();
+  await page.getByRole('button', { name: "View Alex Rivera's profile", exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove friend', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Friends', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove friend', exact: true })).toBeVisible();
+});
+
+test('edits and persists About me and Instagram, rejects invalid links, and can clear Instagram', async ({
+  page,
+}) => {
+  await page.getByRole('button', { name: 'Your profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit profile & status', exact: true }).click();
+  await page.getByLabel('About me', { exact: true }).fill('Coffee, long walks and new places.');
+  await page.getByLabel('Instagram (optional)', { exact: true }).fill('https://example.com/me');
+  await page.getByRole('button', { name: 'Save your changes', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Instagram username');
+  await page
+    .getByLabel('Instagram (optional)', { exact: true })
+    .fill('https://www.instagram.com/zuno_demo_test/');
+  await page.getByRole('button', { name: 'Save your changes', exact: true }).click();
+  await expect(page.getByRole('button', { name: '@zuno_demo_test', exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Your profile', exact: true }).click();
+  await expect(page.getByText('Coffee, long walks and new places.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '@zuno_demo_test', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit profile & status', exact: true }).click();
+  await page.getByLabel('Instagram (optional)', { exact: true }).fill('');
+  await page.getByRole('button', { name: 'Save your changes', exact: true }).click();
+  await expect(page.getByRole('button', { name: '@zuno_demo_test', exact: true })).toHaveCount(0);
 });

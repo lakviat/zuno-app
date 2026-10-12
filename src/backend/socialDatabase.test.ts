@@ -21,7 +21,7 @@ const rpc = async (name: string, args: unknown[] = []) => {
 };
 beforeAll(async () => {
   db = new PGlite({ extensions: { postgis } });
-  await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,raw_user_meta_data jsonb);
+  await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,raw_user_meta_data jsonb,aud text,role text);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to anon,authenticated;grant execute on function auth.uid() to anon,authenticated;
  create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);alter table storage.objects enable row level security;create function storage.foldername(name text) returns text[] language sql immutable as $$select string_to_array(name,'/')$$;grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;
@@ -322,4 +322,57 @@ describe('real Postgres + PostGIS social authorization', () => {
       (await db.query('select * from public.zuno_profiles where user_id=$1', [C])).rows,
     ).toEqual([]);
   });
+});
+
+it('persists Instagram atomically for its owner and preserves old clients and profile visibility', async () => {
+  await db.exec('reset role; begin');
+  try {
+    await as(A);
+    await rpc('zuno_save_profile_details', ['Alice', 'Alice.Insta', 'About Alice', 'alice_zuno']);
+    let snapshot = (await rpc('zuno_social_snapshot')) as { people: Person[] };
+    expect(snapshot.people.find((p) => p.user.id === A)?.profile).toMatchObject({
+      instagram: 'alice.insta',
+      bio: 'About Alice',
+    });
+    await rpc('zuno_save_profile', ['Alice', 'Updated about', 'alice_zuno']);
+    snapshot = (await rpc('zuno_social_snapshot')) as { people: Person[] };
+    expect(snapshot.people.find((p) => p.user.id === A)?.profile.instagram).toBe('alice.insta');
+    await db.exec('savepoint invalid_handle');
+    await expect(
+      rpc('zuno_save_profile_details', ['Wrong name', 'https://evil.test', 'wrong']),
+    ).rejects.toThrow(/Invalid Instagram/);
+    await db.exec('rollback to savepoint invalid_handle');
+    snapshot = (await rpc('zuno_social_snapshot')) as { people: Person[] };
+    expect(snapshot.people.find((p) => p.user.id === A)?.profile.displayName).toBe('Alice');
+    await as(B);
+    await rpc('zuno_save_profile_details', ['Bob', 'bob.insta', '', 'bob_zuno']);
+    await db.exec('savepoint raw_write');
+    await expect(
+      db.query("update public.zuno_profiles set instagram='hijacked' where user_id=$1", [A]),
+    ).rejects.toThrow(/permission denied/);
+    await db.exec('rollback to savepoint raw_write');
+    await as(A);
+    snapshot = (await rpc('zuno_social_snapshot')) as { people: Person[] };
+    expect(snapshot.people.find((p) => p.user.id === A)?.profile.instagram).toBe('alice.insta');
+    await rpc('zuno_save_profile_details', ['Alice', '', 'Updated about', 'alice_zuno']);
+    snapshot = (await rpc('zuno_social_snapshot')) as { people: Person[] };
+    expect(snapshot.people.find((p) => p.user.id === A)?.profile.instagram).toBe('');
+    await db.exec('reset role; set role anon; savepoint anonymous_write');
+    await expect(rpc('zuno_save_profile_details', ['Intruder', 'intruder'])).rejects.toThrow(
+      /permission denied/,
+    );
+    await db.exec('rollback to savepoint anonymous_write');
+  } finally {
+    await db.exec('rollback; reset role');
+  }
+});
+
+it('executes the exact hosted Instagram verification script and rolls back every synthetic identity', async () => {
+  const results = await db.exec(
+    readFileSync(
+      new URL('../../supabase/verification/profile-details.sql', import.meta.url),
+      'utf8',
+    ),
+  );
+  expect(results.at(-1)?.rows[0]).toMatchObject({ rollback_clean: true });
 });

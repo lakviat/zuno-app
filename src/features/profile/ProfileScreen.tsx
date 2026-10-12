@@ -1,13 +1,16 @@
 import { presenceText } from '../presence/presentation';
 import { AvatarUpload } from './AvatarUpload';
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Linking, View } from 'react-native';
 import { Avatar, Button, Chip, Field, Icon, Txt, ui } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { useApp } from '../../state/AppContext';
 import { isBlocked, isFriend } from '../../utils/privacy';
 import { uid } from '../../utils/time';
 import type { Navigate } from '../../navigation/routes';
+import { FriendshipActions } from '../friends/FriendshipActions';
+import { useMotion } from '../location/store';
+import { instagramHandle, instagramUrl, profileDistance } from './details';
 
 export function ProfileScreen({ userId, navigate }: { userId?: string; navigate: Navigate }) {
   const { now, state, me, friends, colors, dispatch, reset, notify, cloud } = useApp();
@@ -17,30 +20,56 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
   const [name, setName] = useState(person.profile.displayName);
   const [username, setUsername] = useState(person.profile.username);
   const [bio, setBio] = useState(person.profile.bio);
+  const [instagram, setInstagram] = useState(person.profile.instagram ?? '');
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const saveInFlight = useRef(false);
+  const [manageFriend, setManageFriend] = useState(false);
+  const device = useMotion(state.currentUserId);
+  const distance = profileDistance(state, person.user.id, now, device);
+  const socialUrl = instagramUrl(person.profile.instagram ?? '');
   const [status, setStatus] = useState(person.presence.status);
   const [confirm, setConfirm] = useState<'remove' | 'block' | 'reset' | 'report' | null>(null);
   const [reason, setReason] = useState('');
   const friend = isFriend(state, person.user.id);
   const blocked = isBlocked(state, person.user.id);
-  const pending = state.friendships.some(
-    (f) => f.status === 'pending' && [f.addresseeId, f.requesterId].includes(person.user.id),
-  );
   const save = async () => {
-    if (!name.trim()) return;
-    if (
-      !(await dispatch({
-        type: 'profile',
-        value: {
-          displayName: name.trim(),
-          bio: bio.trim(),
-          ...(cloud ? { username: username.toLowerCase().trim() } : {}),
-        },
-        status,
-      }))
-    )
+    if (!name.trim() || saveInFlight.current) return;
+    const handle = instagramHandle(instagram);
+    if (handle === undefined) {
+      setSaveError(
+        'Use an Instagram username of up to 30 letters, numbers, periods or underscores.',
+      );
       return;
-    setEdit(false);
-    notify('Your profile feels a little more you.');
+    }
+    setSaveError('');
+    saveInFlight.current = true;
+    setSaving(true);
+    try {
+      if (
+        !(await dispatch({
+          type: 'profile',
+          value: {
+            displayName: name.trim(),
+            bio: bio.trim(),
+            instagram: handle,
+            ...(cloud ? { username: username.toLowerCase().trim() } : {}),
+          },
+          status,
+        }))
+      ) {
+        setSaveError('Your profile wasn’t saved. Please try again.');
+        return;
+      }
+      setInstagram(handle);
+      setEdit(false);
+      notify('Your profile feels a little more you.');
+    } catch {
+      setSaveError('Your profile wasn’t saved. Please try again.');
+    } finally {
+      saveInFlight.current = false;
+      setSaving(false);
+    }
   };
   const perform = async () => {
     if (confirm === 'reset') {
@@ -116,15 +145,57 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
             {presenceText(person.presence, now)}
           </Txt>
         </View>
-        <Txt muted style={{ lineHeight: 22, textAlign: 'center', marginTop: 6 }}>
-          {person.profile.bio}
-        </Txt>
-        <View style={[ui.row, { gap: 5 }]}>
-          <Icon name="map-pin" color={colors.muted} size={13} />
-          <Txt muted style={{ fontSize: 12 }}>
-            {person.profile.city} · profile city
-          </Txt>
+        {!!socialUrl && (
+          <Button
+            kind="secondary"
+            icon="instagram"
+            onPress={() => {
+              void Linking.openURL(socialUrl).catch(() =>
+                notify('Could not open Instagram. Please try again.'),
+              );
+            }}
+          >{`@${person.profile.instagram}`}</Button>
+        )}
+        {!!person.profile.city && (
+          <View style={[ui.row, { gap: 5 }]}>
+            <Icon name="map-pin" color={colors.muted} size={13} />
+            <Txt muted style={{ fontSize: 12 }}>
+              {person.profile.city}
+            </Txt>
+          </View>
+        )}
+      </View>
+      {!own && (
+        <FriendshipActions
+          key={person.user.id}
+          userId={person.user.id}
+          onManage={() => setManageFriend((open) => !open)}
+        />
+      )}
+      {friend && manageFriend && (
+        <View style={{ padding: 16, backgroundColor: colors.raised, borderRadius: 16, gap: 8 }}>
+          <Txt muted>You’re already friends.</Txt>
+          <Button kind="quiet" onPress={() => setConfirm('remove')}>
+            Remove friend
+          </Button>
         </View>
+      )}
+      <View style={{ padding: 20, borderRadius: 20, backgroundColor: colors.raised, gap: 12 }}>
+        <Txt weight="bold" style={{ fontSize: 18 }}>
+          About me
+        </Txt>
+        {!own && (
+          <View style={[ui.row, { gap: 7 }]}>
+            <Icon name="navigation" size={14} color={colors.muted} />
+            <Txt muted style={{ fontSize: 12 }}>
+              {distance ?? 'Distance unavailable'}
+            </Txt>
+          </View>
+        )}
+        <Txt muted style={{ lineHeight: 22 }}>
+          {person.profile.bio ||
+            (own ? 'Add a short bio so people can get to know you.' : 'No bio yet.')}
+        </Txt>
       </View>
       {own ? (
         <>
@@ -177,15 +248,38 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
                   maxLength={40}
                 />
               )}
-              <Field label="Your bio" value={bio} onChangeText={setBio} maxLength={160} multiline />
+              <Field
+                label="About me"
+                placeholder="A little about you and what you enjoy…"
+                value={bio}
+                onChangeText={setBio}
+                maxLength={160}
+                multiline
+                editable={!saving}
+              />
+              <Field
+                label="Instagram (optional)"
+                placeholder="@your_username"
+                value={instagram}
+                onChangeText={setInstagram}
+                maxLength={100}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!saving}
+              />
               <Field
                 label="Current status"
                 value={status}
                 onChangeText={setStatus}
                 maxLength={80}
               />
-              <Button onPress={save} disabled={!name.trim()}>
-                Save your changes
+              {!!saveError && (
+                <Txt accessibilityRole="alert" style={{ color: colors.accent }}>
+                  {saveError}
+                </Txt>
+              )}
+              <Button onPress={save} disabled={!name.trim() || saving}>
+                {saving ? 'Saving…' : 'Save your changes'}
               </Button>
             </>
           ) : (
@@ -238,25 +332,8 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
               >
                 Make a meetup together
               </Button>
-              <Button kind="quiet" onPress={() => setConfirm('remove')}>
-                Remove friend
-              </Button>
             </>
-          ) : (
-            <Button
-              disabled={pending || blocked}
-              onPress={() =>
-                dispatch({
-                  type: 'friend',
-                  id: person.user.id,
-                  operation: 'add',
-                  now: new Date().toISOString(),
-                })
-              }
-            >
-              {blocked ? 'Blocked' : pending ? 'Friend request pending' : 'Add to your people'}
-            </Button>
-          )}
+          ) : null}
           <View style={[ui.row, { gap: 8 }]}>
             <Button style={{ flex: 1 }} kind="danger" onPress={() => setConfirm('block')}>
               Block person

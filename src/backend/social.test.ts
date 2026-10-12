@@ -103,3 +103,34 @@ describe('cloud state and location transport', () => {
     ).rejects.toEqual({ message: 'offline' });
   });
 });
+
+it('saves and clears Instagram through the details RPC while retaining the old API for availability', async () => {
+  const rpc = vi.fn(async (_name: string, _args?: Record<string, unknown>) => ({
+    data: null,
+    error: null,
+  }));
+  const remote = new SupabaseSocial(scopedClient(rpc, user), user);
+  const state = emptyCloud(user);
+  await remote.action(
+    { type: 'profile', value: { instagram: 'zuno_person', bio: 'Hello' }, status: '' },
+    state,
+  );
+  expect(rpc).toHaveBeenLastCalledWith(
+    'zuno_save_profile_details',
+    expect.objectContaining({ instagram: 'zuno_person', bio: 'Hello' }),
+  );
+  await remote.action({ type: 'profile', value: { instagram: '' }, status: '' }, state);
+  expect(rpc).toHaveBeenLastCalledWith(
+    'zuno_save_profile_details',
+    expect.objectContaining({ instagram: '' }),
+  );
+  await remote.action(
+    { type: 'availability', value: 'busy', intent: 'Coffee', now: Date.now() },
+    state,
+  );
+  expect(rpc).toHaveBeenLastCalledWith(
+    'zuno_save_profile',
+    expect.objectContaining({ availability: 'busy' }),
+  );
+  expect(rpc.mock.calls.at(-1)?.[1]).not.toHaveProperty('instagram');
+});

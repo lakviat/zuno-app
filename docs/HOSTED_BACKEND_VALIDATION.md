@@ -34,3 +34,11 @@ Evidence: ignored `release-artifacts/supabase-history-reconcile.sql`, `history-m
 ## Hosted email attempt
 
 One real magic-link request was made from the existing Release iOS simulator to the owner-provided tester address. The app received success and showed “Check your email.” Delivery, callback, verified session and physical-device acceptance remain pending; an accepted request alone is not an end-to-end pass.
+
+## Instagram profile details — October 12, 2026
+
+Applied `202610120001_profile_instagram.sql` to the same hosted Zuno project. Added the optional Instagram column and owner-only `zuno_save_profile_details` RPC, and included the handle in existing authorized profile projections. Existing RLS policies, location rules, and the older profile RPC remain unchanged.
+
+The history row stores the exact repository migration source (MD5 `cd4d64beef8af558e2a093bcbd762dab`). The initial history string had a dollar-quote escaping discrepancy; the inert history text was corrected and its checksum reverified. Application migration execution succeeded once and was not reapplied. Authenticated execution is enabled; anonymous execution is denied.
+
+`supabase/verification/profile-details.sql` passed locally in PostgreSQL/PostGIS and on the hosted database: normalization, owner save/snapshot, legacy-client preservation, invalid input with atomic rollback, direct-write denial, owner isolation, accepted-friend visibility, blocking/search exclusion, unrelated-user exclusion, clearing Instagram, and anonymous denial. Three synthetic identities were rolled back, with `rollback_clean=true` verified. No real profiles were modified and no emails were sent. These are authenticated SQL-role checks, not a real hosted sign-in or multi-device UI test.

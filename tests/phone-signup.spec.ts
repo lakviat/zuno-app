@@ -25,12 +25,14 @@ test('phone preview validates codes, restores only the local session, and signs 
   await expect(page.getByRole('alert')).toContainText('six-zero test code');
   await page.getByLabel('Verification code', { exact: true }).fill('000000');
   await page.getByRole('button', { name: 'Verify & continue', exact: true }).click();
-  await expect(page.getByText('Phone test mode · sample data', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Your profile', exact: true })).toBeVisible();
+  await expect(page.getByText('Phone test mode · sample data', { exact: true })).toHaveCount(0);
   await page.reload();
-  await expect(
-    page.getByRole('button', { name: 'Sign out of phone test', exact: true }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Sign out of phone test', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Your profile', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Your profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Your Zuno account', exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out of this device', exact: true }).click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await page.reload();
   await expect(
     page.getByRole('button', { name: 'Continue with Phone', exact: true }),
@@ -52,9 +54,7 @@ test('allows immediate resend and number correction in phone test mode', async (
   await expect(page.getByText(/Continue with this test number: \+996555123456/)).toBeVisible();
   await page.getByLabel('Verification code', { exact: true }).fill('000000');
   await page.getByRole('button', { name: 'Verify & continue', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: 'Sign out of phone test', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Your profile', exact: true })).toBeVisible();
 });
 
 test('unavailable providers are explained and do not launch external auth in test mode', async ({

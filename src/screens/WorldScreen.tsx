@@ -338,7 +338,7 @@ export function WorldScreen() {
           />
         </View>
       )}
-      {person ? (
+      {person && route.name === 'map' ? (
         <FriendCard
           person={person}
           wide={wide}
@@ -347,6 +347,7 @@ export function WorldScreen() {
           onClose={() => setSelected(undefined)}
         />
       ) : (
+        route.name === 'map' &&
         !wide &&
         personalView &&
         !placing && <MobilePeoplePill bottom={bottom + 88} navigate={navigate} />
