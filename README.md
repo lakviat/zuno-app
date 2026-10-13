@@ -15,6 +15,18 @@ npm run ios:preview
 
 `ios:preview` builds a standalone Release simulator app and launches it. It does not require an Apple Developer Team. Normal development uses `npm run ios`; browser preview uses `npm run web`. iOS is the current validation scope; Android is deferred.
 
+### Build in Xcode locally
+
+Use Node 22.13+ (`nvm use 22` if using nvm), then run `npm run ios:prepare` from this repository. Open the **Zuno.xcworkspace** at the `Prepared workspace` path printed by that command, select the **Zuno** scheme and an iPhone simulator, and press **⌘R**. CocoaPods requires the workspace rather than the `.xcodeproj` alone. A simulator needs no Apple Developer account.
+
+The prepared source lives under `~/Library/Developer/Zuno/`, outside Desktop/iCloud to avoid file-metadata signing errors. Run `npm run ios:prepare` again after source/dependency changes; edit application source in this repository, not the generated copy. For a standalone run without Metro, set **Product → Scheme → Edit Scheme → Run → Build Configuration** to **Release**. Debug runs use Metro on port 8081 (`npm start` from this repository, unless it is already running).
+
+Preparation generates a Debug-only Info.plist that permits the local Metro connection. Release uses the original restricted Info.plist; local debugging does not loosen TestFlight networking settings.
+
+Keep **User Script Sandboxing = No** for Zuno's Debug and Release configurations. Xcode's “Update to recommended settings” can turn it on, which blocks CocoaPods' resource-copy script with `Sandbox: bash deny file-write-create … resources-to-copy-Zuno.txt`. The Expo project plugin restores the compatible setting during preparation. This is a build-script setting, not an app permission or signing bypass. Physical iPhones still need the configured Developer Team and provisioning.
+
+Verified October 13, 2026: Xcode 27 Debug and Release simulator builds pass, and **⌘R** launches the welcome screen on iPhone 18 Pro / iOS 27 with the existing Metro server. Two consecutive prebuilds retain the fixes and the separate Debug/Release network settings.
+
 With valid Supabase configuration, sign in from the welcome screen on iOS, complete onboarding, then open the map. No demo world is uploaded or used as a fallback. With no configuration, an explicitly labeled local sample world remains available for development and browser regression tests; see [local-preview guide](docs/LOCAL_PREVIEW.md).
 
 ### Temporary phone testing in Expo Go and localhost
