@@ -14,7 +14,13 @@ export type Action =
       };
     }
   | { type: 'discovery'; value: Partial<AppSnapshot['discovery']> }
-  | { type: 'availability'; value: 'free' | 'later' | 'busy'; intent: string; now: number }
+  | {
+      type: 'availability';
+      value: 'free' | 'later' | 'busy';
+      intent: string;
+      status?: string;
+      now: number;
+    }
   | {
       type: 'meetup-message';
       actorId: string;
@@ -76,6 +82,7 @@ export function reducer(state: AppSnapshot, action: Action): AppSnapshot {
                 presence: {
                   ...p.presence,
                   availability: action.value,
+                  status: action.status?.trim().slice(0, 80) ?? p.presence.status,
                   freeNow: action.value === 'free',
                   intent: action.intent.trim().slice(0, 60),
                   availableUntil: new Date(action.now + 7200000).toISOString(),

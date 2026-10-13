@@ -133,4 +133,18 @@ it('saves and clears Instagram through the details RPC while retaining the old A
     expect.objectContaining({ availability: 'busy' }),
   );
   expect(rpc.mock.calls.at(-1)?.[1]).not.toHaveProperty('instagram');
+  await remote.action(
+    {
+      type: 'availability',
+      value: 'free',
+      intent: '',
+      status: 'I’m new to the city',
+      now: Date.now(),
+    },
+    state,
+  );
+  expect(rpc).toHaveBeenLastCalledWith(
+    'zuno_save_profile',
+    expect.objectContaining({ availability: 'free', intent: '', status: 'I’m new to the city' }),
+  );
 });

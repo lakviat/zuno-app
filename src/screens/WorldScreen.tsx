@@ -415,7 +415,9 @@ export function WorldScreen() {
       )}
       <SheetHost visible={route.name !== 'map'} onClose={() => navigate({ name: 'map' })}>
         {route.name === 'account' && <AccountScreen navigate={navigate} />}
-        {route.name === 'availability' && <AvailabilityScreen navigate={navigate} />}
+        {route.name === 'availability' && (
+          <AvailabilityScreen navigate={navigate} returnTo={route.returnTo} />
+        )}
         {route.name === 'meetup-chat' && (
           <MeetupChat key={route.meetupId} meetupId={route.meetupId} navigate={navigate} />
         )}

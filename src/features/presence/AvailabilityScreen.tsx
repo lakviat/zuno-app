@@ -5,13 +5,20 @@ import { Button, Chip, Field, Txt, ui } from '../../components/ui';
 import { useApp } from '../../state/AppContext';
 import type { Navigate } from '../../navigation/routes';
 import { isAvailable } from './domain';
-import { activityOptions } from './presentation';
-export function AvailabilityScreen({ navigate }: { navigate: Navigate }) {
+import { activityOptions, statusOptions } from './presentation';
+export function AvailabilityScreen({
+  navigate,
+  returnTo = 'map',
+}: {
+  navigate: Navigate;
+  returnTo?: 'map' | 'profile';
+}) {
   const { me, now, dispatch, notify } = useApp();
   const [value, setValue] = useState<'free' | 'later' | 'busy'>(
     isAvailable(me.presence, now) ? 'free' : (me.presence.availability ?? 'busy'),
   );
   const [intent, setIntent] = useState(me.presence.intent ?? '');
+  const [status, setStatus] = useState(me.presence.status);
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   const mounted = useRef(true);
@@ -28,7 +35,7 @@ export function AvailabilityScreen({ navigate }: { navigate: Navigate }) {
       subtitle="A little signal to your people."
       onClose={() => {
         mounted.current = false;
-        navigate({ name: 'map' });
+        navigate({ name: returnTo });
       }}
       footer={
         <Button
@@ -43,6 +50,7 @@ export function AvailabilityScreen({ navigate }: { navigate: Navigate }) {
                 type: 'availability',
                 value,
                 intent,
+                status,
                 now: Date.now(),
               });
               if (!mounted.current) return;
@@ -51,7 +59,7 @@ export function AvailabilityScreen({ navigate }: { navigate: Navigate }) {
                 return;
               }
               notify(value === 'free' ? 'Free for the next two hours.' : 'Availability updated.');
-              navigate({ name: 'map' });
+              navigate({ name: returnTo });
             } catch {
               if (mounted.current)
                 setError('Your status wasn’t saved. Check your connection and try again.');
@@ -61,7 +69,7 @@ export function AvailabilityScreen({ navigate }: { navigate: Navigate }) {
             }
           }}
         >
-          {saving ? 'Saving…' : 'Set availability'}
+          {saving ? 'Saving…' : 'Set status'}
         </Button>
       }
     >
@@ -79,6 +87,22 @@ export function AvailabilityScreen({ navigate }: { navigate: Navigate }) {
             active={value === id}
             onPress={() => {
               if (!pending.current) setValue(id);
+            }}
+          />
+        ))}
+      </View>
+      <Txt weight="bold">Say a little hello</Txt>
+      <View style={[ui.row, { flexWrap: 'wrap', gap: 8 }]}>
+        {statusOptions.map((label) => (
+          <Chip
+            key={label}
+            label={label}
+            active={status === label && value === 'free' && !intent}
+            onPress={() => {
+              if (pending.current) return;
+              setStatus(label);
+              setIntent('');
+              setValue('free');
             }}
           />
         ))}

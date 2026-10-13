@@ -400,12 +400,11 @@ function Setup({ profile }: { profile: Onboarding }) {
     [username, setUsername] = useState(profile.username),
     [bio, setBio] = useState(profile.bio),
     [avatar, setAvatar] = useState(profile.avatar),
-    [visibility, setVisibility] = useState<Visibility>(profile.visibility),
+    [visibility, setVisibility] = useState<Visibility>('public'),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [available, setAvailable] = useState<boolean | null>(null),
-    [permission, setPermission] = useState<Location.LocationPermissionResponse | null>(null),
-    [back, setBack] = useState(false);
+    [permission, setPermission] = useState<Location.LocationPermissionResponse | null>(null);
   const photo = useAvatarUrl(avatar ?? '');
   const working = useRef(false);
   const draftQueue = useRef(Promise.resolve());
@@ -416,7 +415,7 @@ function Setup({ profile }: { profile: Onboarding }) {
     },
     [],
   );
-  const editProfile = profile.step === 'profile' || back;
+  const editProfile = profile.step === 'profile';
   useEffect(() => {
     const read = () =>
       void Location.getForegroundPermissionsAsync()
@@ -493,7 +492,6 @@ function Setup({ profile }: { profile: Onboarding }) {
             ? 'That username is taken. Choose another.'
             : 'Could not save your profile. Check your details and connection.',
         );
-      setBack(false);
       await account.reloadProfile();
     });
   const upload = () =>
@@ -503,6 +501,8 @@ function Setup({ profile }: { profile: Onboarding }) {
       const { error: issue } = await supabase!.rpc('zuno_save_profile', {
         display_name: profile.name || 'New friend',
         avatar_path: path,
+        status: 'Hey, I am available',
+        availability: 'free',
       });
       if (issue) throw new Error('Your photo couldn’t be saved. You can continue without it.');
       setAvatar(path);
@@ -583,7 +583,7 @@ function Setup({ profile }: { profile: Onboarding }) {
             See nearby people and meetups. Location updates while Zuno is open. You decide who can
             see you.
           </Copy>
-          {(['private', 'friends', 'public'] as const).map((mode) => (
+          {(['public', 'friends', 'private'] as const).map((mode) => (
             <Pressable
               key={mode}
               disabled={busy}
@@ -608,7 +608,7 @@ function Setup({ profile }: { profile: Onboarding }) {
                   ? 'Explore without sharing your location.'
                   : mode === 'friends'
                     ? 'Share with accepted friends only.'
-                    : 'Be discoverable by nearby Zuno users.'}
+                    : 'Share your approximate location with nearby Zuno users.'}
               </Copy>
             </Pressable>
           ))}
@@ -633,9 +633,6 @@ function Setup({ profile }: { profile: Onboarding }) {
           )}
           <Action quiet disabled={busy} onPress={() => finish(false)}>
             Continue without location
-          </Action>
-          <Action quiet disabled={busy} onPress={() => setBack(true)}>
-            Back to profile
           </Action>
         </>
       )}

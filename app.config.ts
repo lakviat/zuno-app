@@ -26,7 +26,7 @@ const config: ExpoConfig = {
     supportsTablet: true,
     usesAppleSignIn: true,
     bundleIdentifier: 'app.zuno.mobile',
-    buildNumber: '4',
+    buildNumber: '5',
     ...(process.env.ZUNO_APPLE_TEAM_ID ? { appleTeamId: process.env.ZUNO_APPLE_TEAM_ID } : {}),
     infoPlist: {
       EXDevMenuShowFloatingActionButton: false,

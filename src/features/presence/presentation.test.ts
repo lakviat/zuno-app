@@ -58,6 +58,18 @@ describe('activity badges for local and hosted presence', () => {
     expect(presencePresentation(active, now).emoji).toBe('☕');
     expect(presencePresentation(active, now + 1000)).toEqual({ emoji: '✌️', status: 'Hello' });
   });
+  it('shows the saved greeting on the map and profile after JSON persistence', () => {
+    const state = reducer(createSeed(), {
+      type: 'availability',
+      value: 'free',
+      intent: '',
+      status: 'I’m open',
+      now,
+    });
+    const restored = JSON.parse(JSON.stringify(state)) as typeof state;
+    const presence = restored.people.find((p) => p.user.id === state.currentUserId)!.presence;
+    expect(presencePresentation(presence, now)).toEqual({ emoji: '👋', status: 'I’m open' });
+  });
   it('survives a local save and JSON persistence without rewriting the editable profile status', () => {
     const state = createSeed();
     const original = state.people.find((p) => p.user.id === state.currentUserId)!.presence;

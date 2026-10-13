@@ -326,6 +326,34 @@ describe('central account lifecycle (mocked provider/device boundary)', () => {
     expect(account.session).toBeNull();
     expect(account.busy).toBe(false);
   });
+  it('returns a verified existing phone identity to its saved profile and map', async () => {
+    m.rpc.mockImplementation(async (name: string) => ({
+      data:
+        name === 'zuno_onboarding_state'
+          ? {
+              ...profile,
+              step: 'complete',
+              completedAt: '2026-10-13T12:00:00Z',
+              name: 'Returning person',
+              username: 'returning_person',
+            }
+          : null,
+      error: null,
+    }));
+    await mount();
+    await act(async () => {
+      await account.phoneAuth.request('2025550123');
+    });
+    await act(async () => {
+      await account.phoneAuth.verify('2025550123', '123456');
+    });
+    expect(account.session?.user.id).toBe('account-a');
+    expect(account.onboarding?.name).toBe('Returning person');
+    expect(
+      startupRoute(account.ready, !!account.session, account.loadingProfile, account.onboarding),
+    ).toBe('map');
+    expect(m.rpc).not.toHaveBeenCalledWith('zuno_onboarding_profile', expect.anything());
+  });
   it('serializes phone sends to prevent double-tap SMS requests', async () => {
     await mount();
     await act(async () => {

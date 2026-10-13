@@ -323,7 +323,7 @@ export class SupabaseSocial implements LocationTransport {
           bio: p.bio,
           username: p.username,
           avatar_path: p.avatar || null,
-          status: action.type === 'profile' ? action.status : me.presence.status,
+          status: action.status ?? me.presence.status,
           availability:
             action.type === 'availability' ? action.value : (me.presence.availability ?? 'busy'),
           intent: action.type === 'availability' ? action.intent : (me.presence.intent ?? ''),

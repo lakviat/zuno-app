@@ -1,7 +1,7 @@
 import { presenceText } from '../presence/presentation';
 import { AvatarUpload } from './AvatarUpload';
 import { useRef, useState } from 'react';
-import { Linking, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import { Avatar, Button, Chip, Field, Icon, Txt, ui } from '../../components/ui';
 import { Sheet } from '../../components/Sheet';
 import { useApp } from '../../state/AppContext';
@@ -33,6 +33,25 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
   const [reason, setReason] = useState('');
   const friend = isFriend(state, person.user.id);
   const blocked = isBlocked(state, person.user.id);
+  const avatar = (
+    <View style={{ padding: 6, borderWidth: 2, borderColor: colors.accentSoft, borderRadius: 70 }}>
+      <Avatar person={person} size={96} online={person.presence.freeNow} />
+      {own && cloud && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            right: 0,
+            padding: 7,
+            borderRadius: 20,
+            backgroundColor: colors.accent,
+          }}
+        >
+          <Icon name="camera" size={18} color="#fff" />
+        </View>
+      )}
+    </View>
+  );
   const save = async () => {
     if (!name.trim() || saveInFlight.current) return;
     const handle = instagramHandle(instagram);
@@ -124,16 +143,23 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
       onClose={() => navigate({ name: 'map' })}
     >
       <View style={{ alignItems: 'center', gap: 10, paddingVertical: 12 }}>
-        <View
-          style={{ padding: 6, borderWidth: 2, borderColor: colors.accentSoft, borderRadius: 70 }}
+        {own && cloud ? <AvatarUpload>{avatar}</AvatarUpload> : avatar}
+        <Pressable
+          disabled={!own}
+          accessibilityRole={own ? 'button' : undefined}
+          accessibilityLabel={own ? 'Edit your profile' : undefined}
+          onPress={() => setEdit(true)}
         >
-          <Avatar person={person} size={96} online={person.presence.freeNow} />
-        </View>
-        <Txt weight="display" style={{ fontSize: 29 }}>
-          {person.profile.displayName}
-        </Txt>
+          <Txt weight="display" style={{ fontSize: 29 }}>
+            {person.profile.displayName}
+          </Txt>
+        </Pressable>
         <Txt muted>@{person.profile.username}</Txt>
-        <View
+        <Pressable
+          disabled={!own}
+          accessibilityRole={own ? 'button' : undefined}
+          accessibilityLabel={own ? 'Change your status' : undefined}
+          onPress={() => navigate({ name: 'availability', returnTo: 'profile' })}
           style={{
             paddingHorizontal: 13,
             paddingVertical: 9,
@@ -144,7 +170,7 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
           <Txt style={{ color: colors.green, fontSize: 12 }}>
             {presenceText(person.presence, now)}
           </Txt>
-        </View>
+        </Pressable>
         {!!socialUrl && (
           <Button
             kind="secondary"
@@ -290,10 +316,13 @@ export function ProfileScreen({ userId, navigate }: { userId?: string; navigate:
           <Button kind="secondary" icon="shield" onPress={() => navigate({ name: 'privacy' })}>
             Location & privacy
           </Button>
-          <Button kind="secondary" icon="zap" onPress={() => navigate({ name: 'availability' })}>
+          <Button
+            kind="secondary"
+            icon="zap"
+            onPress={() => navigate({ name: 'availability', returnTo: 'profile' })}
+          >
             Availability & intent
           </Button>
-          {cloud && <AvatarUpload />}
           <Txt weight="bold">Set the mood</Txt>
           <View style={[ui.row, { gap: 8 }]}>
             {(['light', 'dark', 'system'] as const).map((t) => (

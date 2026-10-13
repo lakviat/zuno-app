@@ -2,7 +2,7 @@ import type { Coordinate, MeetupPlace } from '../types/domain';
 export type Route =
   | { name: 'map'; coordinate?: Coordinate }
   | { name: 'account' }
-  | { name: 'availability' }
+  | { name: 'availability'; returnTo?: 'map' | 'profile' }
   | { name: 'meetup-chat'; meetupId: string }
   | { name: 'friends' }
   | { name: 'profile'; userId?: string }

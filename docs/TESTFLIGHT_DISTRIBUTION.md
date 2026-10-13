@@ -2,7 +2,18 @@
 
 Updated October 13, 2026 (New York). TestFlight upload is authorized; public App Store submission/release and public beta links are not.
 
-## October 13 local iPhone checkpoint
+## October 13 current iPhone checkpoint — build 5
+
+- **Native Apple enabled with explicit owner approval**, allowed client ID `app.zuno.mobile`; no browser OAuth secret. Supabase's live public settings report Apple/Google enabled, Phone disabled. The owner confirmed successful Apple sign-in on installed build 5.
+- **Version 0.1.0 build 5 signed Release PASS**, including arm64/signature/provisioning, Apple entitlement, bundled JS, hosted configuration and fixture-exclusion checks. Installed and launched on the owner's paired iPhone 15 Pro Max. No TestFlight upload or new archive/export was performed.
+- Public is first/preselected in onboarding; Back to profile is removed. A denied/skipped location permission never starts publishing. The backend stays private until the user confirms a choice.
+- Own profile avatar opens photo selection/upload; name opens editing; status opens greeting/activity presets and returns after a successful save. New profiles start with “Hey, I am available” and two-hour availability; existing statuses and privacy choices remain intact.
+- Migration `202610130001_welcome_status.sql` is deployed and recorded in the hosted migration ledger. Nine hosted welcome/status/privacy checks plus the 18 existing onboarding assertions passed and rolled back all synthetic identities. The ledger stores the exact migration source, checksum verified. The deployment guard first stopped on whitespace normalization in its source fingerprint; inspection confirmed the original function was unchanged, and the corrected normalized fingerprint allowed the single new migration. No previous migration was rerun.
+- **Validation:** TypeScript, ESLint, 246 tests across 32 files and 18 browser journeys PASS. The owner confirmed real Apple sign-in, profile-photo upload and status changes on the iPhone. Google was already confirmed on build 4.
+- SMS still needs an owner-created delivery-provider account. No paid account, credentials in code, hosted test OTP or bypass was introduced. Follow [PHONE_AUTH.md](PHONE_AUTH.md).
+- Evidence: ignored `release-artifacts/build5-final-check.log`, `build5-database.log`, `build5-device.log`, `device-build5-install.json`, `device-build5-launch.json`, `welcome-status-hosted-pass.png`, `apple-signin-enabled-build5.png`; managed build `verification.log` and `device-release.log`. Expo localhost remains running.
+
+## October 13 earlier checkpoint — build 4
 
 - All feature work is already merged into `main`; `codex/phase-one-social-map` has no commits missing from main. GitHub and local main matched before this repair. No merge was needed.
 - **Google provider configured and enabled**, with explicit owner approval. Google project `zuno-ios-20261001` now has a Zuno External/Testing consent setup and the `Zuno Supabase Sign-in` web OAuth client. Its only redirect is `https://incrduydvwsimzeojqdu.supabase.co/auth/v1/callback`; the owner-approved tester is allowlisted. The client secret is only in hosted provider configuration, never in the app/repository. Google reaches the account chooser, and Supabase returns a 302 to Google with email/profile scopes. The exact app callback remains `zuno://auth/callback`.
@@ -12,7 +23,7 @@ Updated October 13, 2026 (New York). TestFlight upload is authorized; public App
 - **Validation:** TypeScript, ESLint and 234 tests in 30 files PASS, including disabled-provider prevention, retry after provider activation, network failure and timeout handling. The owner confirmed successful Google sign-in and return to Zuno on installed build 4. Full onboarding completion, cold-start session restoration, sign-out and multi-account behavior remain separate acceptance checks.
 - Evidence: ignored `release-artifacts/device-build4-install.json`, `device-build4-launch.json`, provider/setup screenshots, and native `device-release.log` / `verification.log` in the managed build directory. Existing Expo localhost service remains running.
 
-The October 6 and October 1 sections below preserve earlier distribution evidence. The October 13 checkpoint supersedes their provider status and current device build number. Unique App Store name/record, legal URLs, compliance declaration and broader real-device acceptance remain before TestFlight distribution.
+The October 6 and October 1 sections below preserve earlier distribution evidence. The current build-5 checkpoint supersedes their provider status and device build number. Unique App Store name/record, legal URLs, compliance declaration and broader real-device acceptance remain before TestFlight distribution.
 
 ## October 6 historical checkpoint
 

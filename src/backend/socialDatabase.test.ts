@@ -42,7 +42,63 @@ beforeAll(async () => {
 afterAll(async () => {
   await db?.close();
 });
+it('executes the hosted welcome-status verification and removes its synthetic identity', async () => {
+  await db.exec('reset role');
+  const results = await db.exec(
+    readFileSync(
+      new URL('../../supabase/verification/welcome-status.sql', import.meta.url),
+      'utf8',
+    ),
+  );
+  expect(results.at(-1)?.rows).toEqual([{ passed_checks: 9, rollback_clean: true }]);
+});
 describe('real Postgres + PostGIS social authorization', () => {
+  it('starts with a welcoming status and keeps it through onboarding without sharing location', async () => {
+    await db.exec('reset role; begin');
+    try {
+      await as(A);
+      const profile = async () =>
+        (
+          await db.query<{ status: string; availability: string; active: boolean }>(
+            'select status,availability,available_until>now() as active from public.zuno_profiles where user_id=auth.uid()',
+          )
+        ).rows[0];
+      expect(await profile()).toEqual({
+        status: 'Hey, I am available',
+        availability: 'free',
+        active: true,
+      });
+      await rpc('zuno_onboarding_profile', ['Alice', 'alice_welcome']);
+      expect(await profile()).toEqual({
+        status: 'Hey, I am available',
+        availability: 'free',
+        active: true,
+      });
+      expect(await rpc('zuno_onboarding_state')).toMatchObject({
+        step: 'location',
+        visibility: 'private',
+      });
+      await rpc('zuno_complete_onboarding', ['public']);
+      await rpc('zuno_save_profile', [
+        'Alice',
+        '',
+        'alice_welcome',
+        null,
+        'Working today',
+        'busy',
+        '',
+      ]);
+      await rpc('zuno_bootstrap');
+      await rpc('zuno_complete_onboarding', ['friends']);
+      expect(await profile()).toMatchObject({ status: 'Working today', availability: 'busy' });
+      expect(await rpc('zuno_onboarding_state')).toMatchObject({
+        step: 'complete',
+        visibility: 'public',
+      });
+    } finally {
+      await db.exec('rollback; reset role');
+    }
+  });
   it('persists owner-only onboarding, resumes stages and never re-applies provider defaults', async () => {
     await db.exec('reset role; begin');
     try {

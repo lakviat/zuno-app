@@ -326,7 +326,7 @@ test('map-native Now meetup, group chat, availability and public discovery contr
   await page.getByRole('button', { name: 'Set my availability', exact: true }).click();
   await page.getByRole('button', { name: 'Free now', exact: true }).last().click();
   await page.getByRole('textbox', { name: 'Your idea (optional)', exact: true }).fill('Coffee?');
-  await page.getByRole('button', { name: 'Set availability', exact: true }).click();
+  await page.getByRole('button', { name: 'Set status', exact: true }).click();
   await page.getByRole('button', { name: 'Location privacy', exact: true }).click();
   await page.getByRole('button', { name: 'Public discovery', exact: true }).click();
   await expect(
@@ -375,7 +375,7 @@ test('keeps individual people at wide zoom and persists activity badges on map a
   await page.getByRole('button', { name: 'Set my availability', exact: true }).click();
   await page.getByRole('button', { name: 'Maybe later', exact: true }).click();
   await page.getByRole('button', { name: '🏋️ Gym', exact: true }).click();
-  await page.getByRole('button', { name: 'Set availability', exact: true }).click();
+  await page.getByRole('button', { name: 'Set status', exact: true }).click();
   await expect(me.getByLabel('Maybe later · Gym', { exact: true })).toHaveText('🏋️');
   await page.reload();
   await expect(me).toBeVisible({ timeout: 25000 });
@@ -388,7 +388,7 @@ test('keeps individual people at wide zoom and persists activity badges on map a
   ).toHaveValue('🏋️ Gym');
   await page.getByRole('button', { name: 'Busy', exact: true }).click();
   await page.getByRole('button', { name: '🍸 Drinks', exact: true }).click();
-  await page.getByRole('button', { name: 'Set availability', exact: true }).click();
+  await page.getByRole('button', { name: 'Set status', exact: true }).click();
   await expect(me.getByLabel('Busy · Drinks', { exact: true })).toHaveText('🍸');
 });
 

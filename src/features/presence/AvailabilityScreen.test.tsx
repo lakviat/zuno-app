@@ -91,6 +91,26 @@ it('handles a thrown save error without reporting success', async () => {
   expect(m.notify).not.toHaveBeenCalled();
 });
 
+it('saves a greeting, clears the old activity, and returns to the profile after persistence', async () => {
+  await act(async () =>
+    tree.update(<AvailabilityScreen navigate={m.navigate} returnTo="profile" />),
+  );
+  await act(async () => chip('I’m new to the city').props.onPress());
+  m.dispatch.mockResolvedValueOnce(true);
+  await act(async () => {
+    await button().props.onPress();
+  });
+  expect(m.dispatch).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: 'availability',
+      value: 'free',
+      intent: '',
+      status: 'I’m new to the city',
+    }),
+  );
+  expect(m.navigate).toHaveBeenCalledExactlyOnceWith({ name: 'profile' });
+});
+
 it('does not navigate away from a newer screen when a dismissed save completes', async () => {
   let finish!: (saved: boolean) => void;
   m.dispatch.mockImplementationOnce(
