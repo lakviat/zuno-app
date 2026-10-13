@@ -26,6 +26,7 @@ const m = vi.hoisted(() => ({
   remove: vi.fn(),
   disconnect: vi.fn(),
   stop: vi.fn(),
+  settings: vi.fn(),
 }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
@@ -53,7 +54,11 @@ vi.mock('../../backend/client', () => ({
   get expoGo() {
     return m.expoGo;
   },
-  backendConfig: { status: 'configured' },
+  backendConfig: {
+    status: 'configured',
+    url: 'https://unit-fixture.supabase.co',
+    publishableKey: 'sb_publishable_unit_fixture',
+  },
   revokeLocalSession: async () => {},
   beginSignIn: async () => {},
   supabase: {
@@ -119,6 +124,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   m.session = null;
   m.expoGo = false;
+  m.settings.mockImplementation(async () =>
+    Response.json({ external: { apple: true, google: true } }),
+  );
+  vi.stubGlobal('fetch', m.settings);
   m.rpc.mockImplementation(async (name: string) => ({
     data: name === 'zuno_onboarding_state' ? profile : null,
     error: null,
@@ -160,8 +169,40 @@ beforeEach(() => {
 });
 afterEach(async () => {
   if (tree) await act(async () => tree.unmount());
+  vi.unstubAllGlobals();
 });
 describe('central account lifecycle (mocked provider/device boundary)', () => {
+  it.each(['google', 'apple'] as const)(
+    'keeps disabled %s sign-in in the app and supports retry after enabling',
+    async (provider) => {
+      m.settings.mockResolvedValueOnce(Response.json({ external: { [provider]: false } }));
+      await mount();
+      await act(async () => {
+        expect(await account.signIn(provider)).toBe(false);
+      });
+      expect(account.error).toContain('isn’t enabled for Zuno yet');
+      expect(account.busy).toBe(false);
+      expect(account.session).toBeNull();
+      expect(m.apple).not.toHaveBeenCalled();
+      expect(m.oauth).not.toHaveBeenCalled();
+      expect(m.browser).not.toHaveBeenCalled();
+      await act(async () => {
+        expect(await account.signIn(provider)).toBe(true);
+      });
+      expect(account.error).toBe('');
+      expect(account.session?.user.id).toBe('account-a');
+    },
+  );
+  it('a provider connection failure leaves sign-in retryable without opening a browser', async () => {
+    m.settings.mockRejectedValueOnce(new Error('network unavailable'));
+    await mount();
+    await act(async () => {
+      await account.signIn('google');
+    });
+    expect(account.error).toContain('Check your connection');
+    expect(account.busy).toBe(false);
+    expect(m.browser).not.toHaveBeenCalled();
+  });
   it.each(['google', 'apple', 'email'] as const)(
     'does not launch unsupported real %s sign-in inside Expo Go',
     async (provider) => {

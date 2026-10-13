@@ -24,6 +24,7 @@ import {
 import { requestPhoneCode, verifyPhoneCode, type PhoneAuth } from '../../backend/phoneAuth';
 import { endSessionServices } from '../../backend/sessionLifecycle';
 import { onboardingState, type Onboarding } from '../../backend/onboarding';
+import { ProviderAvailabilityError, requireSocialProvider } from '../../backend/socialProviders';
 
 interface Account {
   session: Session | null;
@@ -234,8 +235,9 @@ export function AccountProvider({ children }: PropsWithChildren) {
     setBusy(true);
     setError('');
     try {
-      await beginSignIn();
       if (Platform.OS === 'web') throw new Error('ios-only');
+      if (provider !== 'email') await requireSocialProvider(backendConfig, provider);
+      await beginSignIn();
       if (provider === 'email') {
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
           setError('Enter a valid email address.');
@@ -292,11 +294,13 @@ export function AccountProvider({ children }: PropsWithChildren) {
         issue.code === 'ERR_REQUEST_CANCELED'
       ))
         setError(
-          Platform.OS === 'web'
-            ? 'Open Zuno on your iPhone to sign in.'
-            : provider === 'email'
-              ? 'We couldn’t send a sign-in link. Check your address and connection, wait a minute, then try again.'
-              : 'Sign in couldn’t be completed. Please try again. This sign-in option may not be available in this beta yet.',
+          issue instanceof ProviderAvailabilityError
+            ? issue.message
+            : Platform.OS === 'web'
+              ? 'Open Zuno on your iPhone to sign in.'
+              : provider === 'email'
+                ? 'We couldn’t send a sign-in link. Check your address and connection, wait a minute, then try again.'
+                : 'Sign in couldn’t be completed. Please try again. This sign-in option may not be available in this beta yet.',
         );
       return false;
     } finally {

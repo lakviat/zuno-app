@@ -1,12 +1,14 @@
 # Zuno — TestFlight readiness
 
-Updated October 6, 2026, for the requested **real multiuser backend** beta. Earlier local-preview findings are preserved in [the historical audit](docs/TESTFLIGHT_AUDIT_2026-10-01.md).
+Updated October 13, 2026, for the requested **real multiuser backend** beta. Earlier local-preview findings are preserved in [the historical audit](docs/TESTFLIGHT_AUDIT_2026-10-01.md).
+
+**October 13 current checkpoint:** Google OAuth is configured/enabled in External/Testing mode with an approved test account. The live authorization endpoint reaches Google, and the mobile callback allowlist is correct. Apple remains disabled at the owner's explicit request; SMS remains unconfigured. Version 0.1.0 build 4 passed signed physical-device Release/artifact checks and was installed/launched on the paired iPhone 15 Pro Max. TypeScript, ESLint and 234 tests across 30 files pass. Real Google callback/session/onboarding acceptance is still pending. This direct install includes bundled JS and needs no Metro; it is not a TestFlight upload. See [the October 13 distribution checkpoint](docs/TESTFLIGHT_DISTRIBUTION.md) for current provider/build details, which supersede the historical notes below.
 
 Phone-auth update, October 2, 2026: the guarded phone test now works in iOS Expo Go as well as localhost, including ten-digit US input without `+1`. Other providers are visibly unavailable in Expo Go; real Google/Apple/SMS configuration is still pending. The October 6 signed Release/archive/distribution IPA all pass fixture-exclusion checks; the temporary fixture remains limited to Development. Remove the temporary fixture before the next upload as described below. See [SMS activation, native validation and removal checklist](docs/PHONE_AUTH.md). The earlier native archive evidence below predates this update; current production web/iOS exports pass fixture-exclusion checks.
 
 ## Current Status
 
-**READY FOR SIGNING** for engineering preparation. The unsigned Release archive passes and the hosted social/onboarding schema is deployed and verified. This is not certification of a fully accepted hosted beta: Apple/Google/SMS provider configuration, hosted email delivery, legal URLs and physical iPhone acceptance remain before distribution.
+**READY FOR SIGNING** for engineering preparation. Signed Release device builds pass and the hosted social/onboarding schema is deployed and verified. This is not certification of a fully accepted hosted beta: Apple/SMS provider configuration, real Google/hosted email acceptance, legal URLs and physical iPhone acceptance remain before distribution.
 
 October 6 distribution checkpoint: paid Apple membership is active, App Store Connect is accessible, and automatic signing registered the existing bundle ID with Sign in with Apple. Build 3 passed signed physical-device Release validation and was installed/launched on the paired iPhone. This is a direct development-signed installation, not a TestFlight installation or complete physical acceptance. Apple rejected the new app record's name “Zuno” as already in use; a unique store name is awaiting the owner. Supabase Apple-provider enablement is also awaiting owner approval. See [current distribution status](docs/TESTFLIGHT_DISTRIBUTION.md) for archive/upload progress and remaining actions, [authentication architecture](AUTH_ONBOARDING_ARCHITECTURE.md) and [hosted validation](docs/HOSTED_BACKEND_VALIDATION.md).
 
@@ -22,7 +24,7 @@ October 6 distribution checkpoint: paid Apple membership is active, App Store Co
 | Deployment target / devices                  | iOS 16.4; iPhone and iPad; arm64 device                                                                      |
 | Bundle ID                                    | `app.zuno.mobile`, registered to the verified paid Team; preserved                                           |
 | Marketing version                            | 0.1.0 from package.json                                                                                      |
-| Build number                                 | 3 from app.config.ts `ios.buildNumber`                                                                       |
+| Build number                                 | 4 from app.config.ts `ios.buildNumber`                                                                       |
 | Native/runtime                               | Xcode 27 / iOS 27 SDK; Swift 5 language mode; Expo 57.0.26 / RN 0.86.3 / Hermes                              |
 | Dependency managers / CI                     | npm and CocoaPods; `.github/workflows/build.yml` validates tests and production exports; EAS profiles unused |
 | Signing                                      | Automatic signing verified; owner's Team loaded from ignored local configuration; no credentials committed   |
@@ -36,7 +38,7 @@ Before each new TestFlight upload increment `ios.buildNumber` in `app.config.ts`
 | Debug simulator                           | Prior baseline PASS; not repeated for this backend milestone      |
 | Release generic iPhone / unsigned archive | PASS; verified final arm64 device archive                         |
 | Release simulator                         | PASS; final build installed/launched on iPhone 17 / iOS 27        |
-| Signed physical iPhone Release            | PASS, build 3; installed and launched on paired iPhone 15 Pro Max |
+| Signed physical iPhone Release            | PASS, build 4; installed and launched on paired iPhone 15 Pro Max |
 | Signed archive                            | PASS, build 3; signatures and production artifact checks passed   |
 | App Store export                          | PASS, build 3; distribution IPA and signatures verified           |
 | Upload / processing                       | NOT PERFORMED; unique app name/record and owner responses pending |
@@ -58,6 +60,8 @@ Release verification checks arm64, minimum OS, identity/version, strict ATS, sce
 Upstream RN Maps/SVG deprecations, SDK script output warnings and skipped App Intents extraction remain. Prebuilt React/ReactNativeDependencies/Hermes lack some vendor dSYMs; app symbols exist. Apple may warn on upload and vendor-frame symbolication may be limited. No fake dSYMs or warning suppression was added.
 
 ## Tests
+
+- **October 13:** 234 tests across 30 files PASS, plus TypeScript and ESLint. This includes new social-provider availability and account-flow regressions. Earlier hosted/database and browser evidence below was not rerun for this provider-configuration change.
 
 - **191 tests across 22 files PASS, rerun October 6:** existing domain/zoom/location behavior, Auth config/callback/Keychain, account SQL/RLS, social PostgreSQL/PostGIS policies/commands, cloud transport lifecycle/account isolation and phone OTP validation/onboarding. The current GitHub Actions run also passed the browser suites and production-export boundary checks. See docs/PHONE_AUTH.md.
 - **11 real local Supabase integration checks PASS:** three authenticated accounts; actual Realtime inbox denial/delivery; private/friends/public; 25 mph from m/s; block while connected; coarse projection; stop/reconnect; persistent/idempotent private chat; concurrent final meetup seat and leave revocation; private Storage ownership; anonymous/raw-GPS denial. Final invalidation-only transport was retested. Zero disposable accounts remain. Cron is active.

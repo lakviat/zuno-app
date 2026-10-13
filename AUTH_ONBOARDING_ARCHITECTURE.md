@@ -12,6 +12,8 @@ Implemented against the existing Supabase social backend on October 1, 2026. No 
 
 ## Startup and current-user state
 
+October 13, 2026: Google OAuth is configured and enabled in hosted Supabase, with External/Testing consent and the owner-approved test account. Apple is deliberately disabled following the owner's response; SMS is also unconfigured. Before opening either social provider, the native app checks public `/auth/v1/settings` with only the publishable key and an eight-second timeout. Disabled providers show an in-app explanation, and network/configuration failures remain retryable. Settings are rechecked on each attempt so enabling a provider does not require another app build. This check improves failure handling; it never substitutes for provider token validation or grants a session.
+
 `AccountProvider → AuthGate → account-keyed AppProvider → LiveLocationProvider → existing WorldScreen`.
 
 1. Supabase restores the Keychain session behind the bootstrap view.

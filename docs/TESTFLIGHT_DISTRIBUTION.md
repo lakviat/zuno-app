@@ -1,8 +1,20 @@
 # Zuno — signed TestFlight distribution
 
-Updated October 6, 2026 (New York). TestFlight upload is authorized; public App Store submission/release and public beta links are not.
+Updated October 13, 2026 (New York). TestFlight upload is authorized; public App Store submission/release and public beta links are not.
 
-## October 6 current checkpoint
+## October 13 local iPhone checkpoint
+
+- All feature work is already merged into `main`; `codex/phase-one-social-map` has no commits missing from main. GitHub and local main matched before this repair. No merge was needed.
+- **Google provider configured and enabled**, with explicit owner approval. Google project `zuno-ios-20261001` now has a Zuno External/Testing consent setup and the `Zuno Supabase Sign-in` web OAuth client. Its only redirect is `https://incrduydvwsimzeojqdu.supabase.co/auth/v1/callback`; the owner-approved tester is allowlisted. The client secret is only in hosted provider configuration, never in the app/repository. Google reaches the account chooser, and Supabase returns a 302 to Google with email/profile scopes. The exact app callback remains `zuno://auth/callback`.
+- **Apple deliberately remains disabled:** the owner selected “Leave Apple disabled.” Native entitlement and implementation remain available for future activation. SMS also remains disabled.
+- The app checks hosted social-provider availability before presenting browser/native sign-in. Disabled providers and connection failures stay in the app with a clear retryable message; no raw “Unsupported provider” page is opened for a known-disabled provider.
+- **Version 0.1.0, build 4:** signed arm64 Release build and artifact validation PASS, installed and launched on the paired iPhone 15 Pro Max. JS is embedded; Metro is unnecessary for this installation. This is a development-signed direct install, not TestFlight. No new archive/export/upload was attempted; build 3 archive evidence below is historical.
+- **Validation:** TypeScript, ESLint and 234 tests in 30 files PASS, including disabled-provider prevention, retry after provider activation, network failure and timeout handling. Real owner Google sign-in, callback, onboarding and session persistence still require acceptance on the iPhone; reaching the Google chooser is not an authenticated session test.
+- Evidence: ignored `release-artifacts/device-build4-install.json`, `device-build4-launch.json`, provider/setup screenshots, and native `device-release.log` / `verification.log` in the managed build directory. Existing Expo localhost service remains running.
+
+The October 6 and October 1 sections below preserve earlier distribution evidence. The October 13 checkpoint supersedes their provider status and current device build number. Unique App Store name/record, legal URLs, compliance declaration and broader real-device acceptance remain before TestFlight distribution.
+
+## October 6 historical checkpoint
 
 - **Membership/signing resolved:** paid membership is active and App Store Connect is accessible. Xcode registered `app.zuno.mobile` on the verified owner's Team. Sign in with Apple is enabled for that App ID; push/background/associated-domain capabilities remain off.
 - **Version 0.1.0, build 3:** signed arm64 physical-iPhone Release build and artifact validation PASS. The build is installed on the paired iPhone 15 Pro Max and `devicectl` confirmed launch; the process remained running on a later inspection. This is a direct development-signed install, not a TestFlight install or an end-to-end acceptance test.
