@@ -85,8 +85,12 @@ export function MeetupForm({
       placeId,
       place: pinnedPlace?.id === placeId ? pinnedPlace : undefined,
       startNow,
-      startsAt: toInstant(start),
-      endsAt: toInstant(end),
+      // Unchanged wall times must retain their original DST offset and seconds.
+      startsAt:
+        existing && start === localDateTime(existing.startsAt)
+          ? existing.startsAt
+          : toInstant(start),
+      endsAt: existing && end === localDateTime(existing.endsAt) ? existing.endsAt : toInstant(end),
       visibility,
       invitedUserIds: invites,
       capacity: capacity.trim()
@@ -288,12 +292,14 @@ export function MeetupForm({
             >
               <Txt weight="bold">{pinnedPlace.name}</Txt>
               <Txt muted>{pinnedPlace.area}</Txt>
-              <Button
-                kind="quiet"
-                onPress={() => requestLeave({ name: 'create-meetup', friendId })}
-              >
-                Choose another map spot
-              </Button>
+              {!meetupId && (
+                <Button
+                  kind="quiet"
+                  onPress={() => requestLeave({ name: 'create-meetup', friendId })}
+                >
+                  Choose another map spot
+                </Button>
+              )}
             </View>
           )}
           {!pinnedPlace &&

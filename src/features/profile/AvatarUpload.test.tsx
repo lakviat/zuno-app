@@ -68,10 +68,13 @@ it('keeps the old photo on cancelled selection', async () => {
   expect(m.remove).not.toHaveBeenCalled();
   expect(photo().props.disabled).toBe(false);
 });
-it('cleans up only the new upload if saving fails', async () => {
+it('keeps both photos when a successful write cannot be confirmed by refresh', async () => {
   m.dispatch.mockResolvedValue(false);
   await act(async () => photo().props.onPress());
-  expect(m.remove).toHaveBeenCalledExactlyOnceWith(['owner/new.jpg']);
+  expect(m.remove).not.toHaveBeenCalled();
+  expect(m.notify).toHaveBeenCalledExactlyOnceWith(
+    'Could not confirm the photo change. Reopen your profile before retrying.',
+  );
   expect(m.notify).not.toHaveBeenCalledWith('Profile photo saved.');
   expect(photo().props.disabled).toBe(false);
 });

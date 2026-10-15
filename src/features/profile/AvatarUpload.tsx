@@ -21,7 +21,8 @@ export function AvatarUpload({ children }: PropsWithChildren) {
         status: me.presence.status,
       });
       if (!saved) {
-        await supabase.storage.from('zuno-avatars').remove([path]);
+        // The profile write may have succeeded before its refresh failed.
+        notify('Could not confirm the photo change. Reopen your profile before retrying.');
         return;
       }
       if (me.profile.avatar)
